@@ -34,7 +34,7 @@ node scripts/make-icons.mjs        # PWA icons
 
 One-time: `pnpm exec wrangler login` (opens a browser), then `pnpm exec wrangler pages project create vocab-app`.
 
-Every release: `pnpm deploy`. The URL is `https://vocab-app.pages.dev` (or the custom domain you attach).
+Every release: `pnpm run deploy` (bare `pnpm deploy` is a different pnpm built-in). The URL is `https://vocab-app.pages.dev` (or the custom domain you attach).
 On the phone: open the URL in Safari → Share → Add to Home Screen. Open it from the icon, not from Safari,
 so it runs installed (offline shell, its own storage).
 
