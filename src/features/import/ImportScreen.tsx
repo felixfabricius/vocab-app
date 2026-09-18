@@ -5,7 +5,7 @@ import { repo } from "@/app/services";
 import { draftContext, llmEnv } from "@/app/llmEnv";
 import { useSettings } from "@/app/useSettings";
 import { parsePasteImport, parseTsvLines } from "@/core/import/paste";
-import { draftsFromTranslateLog, parseTranslateLog } from "@/core/import/translateLog";
+import { draftsFromTranslateLog, latestTimestamp, parseTranslateLog, rowsAfter } from "@/core/import/translateLog";
 import type { ImportBatch } from "@/core/types";
 import { enrichEntryIds } from "@/features/entries/enrichService";
 import { prepareImage } from "@/llm/image";
@@ -137,10 +137,15 @@ export function ImportScreen() {
   async function onTranslateLog(file: File) {
     await run("Translate log import", async () => {
       const parsed = parseTranslateLog(await file.text());
-      const drafts = draftsFromTranslateLog(parsed.rows);
-      if (drafts.length === 0) return { message: `No new items. ${parsed.errors.join("; ")}` };
+      const s = await repo.getSettings();
+      const fresh = rowsAfter(parsed.rows, s.translateLogImportedUntil);
+      const errors = parsed.errors.length ? ` Skipped lines: ${parsed.errors.join("; ")}` : "";
+      const drafts = draftsFromTranslateLog(fresh);
+      const newest = latestTimestamp(fresh);
+      if (newest) await repo.saveSettings({ translateLogImportedUntil: newest });
+      if (drafts.length === 0) return { message: `No new lookups since the last import.${errors}` };
       const batch = await createBatch(repo, { sourceType: "translate", label: `Translate log ${new Date().toLocaleDateString()}`, drafts, frequency: await loadFrequency() });
-      return { batchId: batch.id, message: `${drafts.length} items from ${parsed.rows.length} lookups` };
+      return { batchId: batch.id, message: `${drafts.length} items from ${fresh.length} new lookups.${errors}` };
     });
   }
 
@@ -276,10 +281,11 @@ export function ImportScreen() {
       <Card className="mb-4">
         <h2 className="mb-2 font-medium">Translate log</h2>
         <p className="mb-3 text-sm text-muted">
-          The file the lock-screen Shortcuts write: iCloud Drive › Shortcuts › vocab-import › translate-log.jsonl. Works without an API key.
+          The file the lock-screen Shortcuts write: iCloud Drive › Kurzbefehle › vocab-import › translate-log.txt. Only lookups newer than the last import are
+          added. Works without an API key.
         </p>
         <Button className="w-full" disabled={!!busy} onClick={() => logInput.current?.click()}>
-          Choose translate-log.jsonl
+          Choose translate-log.txt
         </Button>
         <input ref={logInput} type="file" accept=".jsonl,.txt,.json,text/plain,application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onTranslateLog(f); e.target.value = ""; }} />
       </Card>

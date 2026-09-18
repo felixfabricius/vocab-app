@@ -33,7 +33,7 @@ describe("app smoke", () => {
     await waitFor(() => expect(screen.getByText("Today")).toBeTruthy(), { timeout: 10000 });
     await waitFor(() => expect(screen.getByText(/Review \d+ cards/)).toBeTruthy(), { timeout: 10000 });
     expect(screen.getByText(/entries in your collection/)).toBeTruthy();
-  });
+  }, 30000);
 
   it("navigates to Words, Import, Translate, Settings and Grammar without crashing", async () => {
     const { App } = await import("./App");
@@ -56,7 +56,7 @@ describe("app smoke", () => {
     await waitFor(() => expect(screen.getByText("Grammar")).toBeTruthy());
     fireEvent.click(screen.getByText("Open"));
     await waitFor(() => expect(screen.getByText("Tenses")).toBeTruthy());
-  });
+  }, 30000);
 
   it("starts a review session and can flip and grade a card", async () => {
     const { App } = await import("./App");

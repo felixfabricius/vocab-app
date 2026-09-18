@@ -249,6 +249,8 @@ export interface Settings {
   llmUsage?: LlmUsage;
   /** Warn above this many USD per day; hard stop at twice this */
   dailySpendCapUsd: number;
+  /** Newest translate-log timestamp already imported; older lines are skipped */
+  translateLogImportedUntil?: string;
   updatedAt: string;
 }
 

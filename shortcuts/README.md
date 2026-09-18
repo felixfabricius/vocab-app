@@ -1,47 +1,88 @@
-# Lock-screen translate with iOS Shortcuts
+# Lock-screen translate with iOS Shortcuts (Kurzbefehle)
 
-Four shortcuts give offline, free translation from the lock screen and log every lookup
-to a file the app imports. They use Apple's on-device translation (download the Spanish
-pack once: Settings → Apps → Translate → Downloaded Languages, or the prompt on first use).
+Four shortcuts give offline, free translation from the lock screen. Each one also appends one line
+per lookup to a text file that the app imports later. German iOS names are used throughout;
+exact wording can differ slightly between iOS versions.
 
-## Build each shortcut (Shortcuts app → + )
+## One-time preparation
 
-| Name | Step 1 | Step 2 | Step 3 | Step 4 |
-|---|---|---|---|---|
-| **EN→ES Type** | Ask for Input (Text), prompt "English" | Translate Text: *Provided Input* from English to Spanish, On-device ON | Show Result: *Translated Text* | Append to Text File (see below), dir `en-es` |
-| **EN→ES Speak** | Dictate Text, Language English, Stop listening: After pause | same | same | same |
-| **ES→EN Type** | Ask for Input (Text), prompt "Español" | Translate Text from Spanish to English, On-device ON | Show Result | Append, dir `es-en` |
-| **ES→EN Speak** | Dictate Text, Language Spanish (Chile) | same | same | same |
+1. **Offline languages.** Einstellungen › Apps › Übersetzen › Geladene Sprachen: download Spanisch and Englisch.
+   On the same screen, switch on **Auf dem Gerät-Modus**, so nothing goes to Apple's servers.
+2. **Log folder.** Dateien app › Durchsuchen › iCloud Drive › **Kurzbefehle** › tap ⋯ › Neuer Ordner › `vocab-import`.
+   The Kurzbefehle folder appears once any shortcut has used a file; if it is missing, create it too.
 
-### Step 4, the log line
+## The log file
 
-Add a **Text** action with exactly this content (replace `en-es` with `es-en` in the two ES→EN shortcuts).
-Insert the variables from the variable picker, and use the **Current Date** action formatted as ISO 8601
-(add a *Format Date* action: Date Format → Custom → `yyyy-MM-dd'T'HH:mm:ssZ`):
+- Path: `iCloud Drive › Kurzbefehle › vocab-import › translate-log.txt`
+- One line per lookup, four fields separated by `|||`:
 
 ```
-{"at":"<Formatted Date>","dir":"en-es","src":<Provided Input as JSON string>,"dst":<Translated Text as JSON string>}
+2026-09-18T19:05:12+02:00 ||| en-es ||| where is the bathroom ||| ¿Dónde está el baño?
 ```
 
-The simplest way to get valid JSON strings: use the **Get Dictionary Value**-free approach below instead:
+  Date, direction (`en-es` or `es-en`), what you typed or said, the translation.
+  The file is created automatically by the first lookup.
 
-1. **Dictionary** action with keys `at`, `dir`, `src`, `dst` and the variables as values.
-2. **Get Text from Input** on the dictionary → this yields the JSON line.
-3. **Append to Text File**: File = `Shortcuts/vocab-import/translate-log.jsonl` in iCloud Drive,
-   Text = the JSON from step 2, **Make New Line: ON**.
+## Build the first shortcut: "EN→ES Tippen"
 
-Turn "Show When Run" off on the Append action so it stays silent.
+Kurzbefehle app › **+** (top right) › tap the name at the top › rename to `EN→ES Tippen`.
+Add these actions in order with **Aktion hinzufügen** / the search field at the bottom:
+
+1. **Nach Eingabe fragen**
+   - Eingabetyp: *Text*. Frage: `Englisch`.
+   - Tap the arrow › **Mehrzeilig zulassen**: off (keeps one lookup on one line).
+2. **Text übersetzen**
+   - Tap the blue *Text* placeholder › choose the variable **Angegebene Eingabe**.
+   - From **Englisch** to **Spanisch**.
+3. **Text**
+   - Type the line below. The three bracketed items are variables: tap where they go,
+     then pick them from the variable bar above the keyboard (or **Variable auswählen**).
+   - `[Aktuelles Datum] ||| en-es ||| [Angegebene Eingabe] ||| [Übersetzter Text]`
+   - Tap the inserted **Aktuelles Datum** › Datumsformat: **ISO 8601** › **Uhrzeit einschließen**: on.
+4. **An Textdatei anhängen**
+   - Text: the **Text** from step 3 (usually filled in automatically).
+   - Dateipfad: `vocab-import/translate-log.txt` (relative to iCloud Drive › Kurzbefehle).
+   - **Neue Zeile erstellen**: on.
+5. **Ergebnis anzeigen**
+   - Tap the placeholder › **Übersetzter Text**.
+
+Run it once from inside the Kurzbefehle app (▶). Allow file access when asked, then check that
+`translate-log.txt` appeared in the Dateien app with one line in it.
+
+The log is written before the result is shown, so swiping the result away never loses a lookup.
+
+## The other three: duplicate and edit
+
+Long-press the finished shortcut › **Duplizieren**, rename, then change only what the table says.
+
+| Shortcut | Step 1 | Step 2 | Direction in step 3 |
+|---|---|---|---|
+| **EN→ES Sprechen** | Replace with **Text diktieren**: Sprache *Englisch*, Zuhören beenden *Nach Pause* | Input variable: **Diktierter Text** | `en-es` |
+| **ES→EN Tippen** | **Nach Eingabe fragen**, Frage `Español` | From **Spanisch** to **Englisch** | `es-en` |
+| **ES→EN Sprechen** | **Text diktieren**: Sprache *Spanisch (Chile)* | Input **Diktierter Text**, from **Spanisch** to **Englisch** | `es-en` |
+
+In the Sprechen variants, also replace **Angegebene Eingabe** with **Diktierter Text** in step 3.
+The first variable after the direction is always what you entered, the second always the translation;
+the app works out which side is Spanish from the direction.
 
 ## Put them on the lock screen
 
-- **Lock Screen widget**: long-press the lock screen → Customize → tap the widget area → Shortcuts → pick a shortcut. Up to four small ones fit.
-- **Bottom-corner controls (iOS 18+)**: Customize → tap a corner control → search "Shortcut" → pick one.
-- **Control Center**: add "Shortcut" controls the same way.
-- **Back Tap**: Settings → Accessibility → Touch → Back Tap → Double Tap → pick a shortcut. Works while locked.
+- **Lock Screen widget:** long-press the lock screen › Anpassen › Sperrbildschirm › tap the widget row ›
+  Kurzbefehle › pick a shortcut. Up to four small widgets fit, one per shortcut.
+- **Bottom-corner controls:** in the same Anpassen view, tap the − on a corner control, then + ›
+  search "Kurzbefehl" › pick one.
+- **Back Tap (works while locked):** Einstellungen › Bedienungshilfen › Tippen › Auf Rückseite tippen ›
+  Doppeltippen › pick your most-used shortcut.
 
 ## Import into the app
 
-Import → **Translate log** → pick `translate-log.jsonl` from iCloud Drive/Shortcuts/vocab-import.
-Rows are de-duplicated by timestamp, short items become suggestions, long sentences are skipped.
-You can clear the file afterwards or leave it; re-imports skip what was already imported in the same file
-(the app ignores duplicates within one import; delete old lines occasionally to keep it small).
+1. App › **Import** › Translate log › **Choose translate-log.txt**.
+2. In the file picker: Durchsuchen › iCloud Drive › Kurzbefehle › vocab-import › `translate-log.txt`.
+3. Short lookups become suggestions in the inbox; lookups longer than eight words are skipped.
+4. Accept the ones you want. The app then offers to enrich them with Claude: example sentence, gender, notes.
+
+The app remembers the newest timestamp it imported. Next time, pick the same file again: only lines
+added since then are imported, so you never need to clear the file. Words already in your collection
+show up as "known" and stay unchecked.
+
+The app also still accepts the older JSON-per-line format.
