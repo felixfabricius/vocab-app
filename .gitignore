@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+dev-dist/
+.wrangler/
+
+# environment / secrets
+.env
+.env.*
+!.env.example
+
+# local data and exports
+*.local.json
+exports/
+scratch/
+
+# editor / os
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# claude code local settings
+.claude/settings.local.json
+
+# test / coverage
+coverage/
