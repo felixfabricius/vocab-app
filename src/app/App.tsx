@@ -6,7 +6,9 @@ import { seedIfNeeded } from "./seed";
 import { TodayScreen } from "@/features/today/TodayScreen";
 import { ReviewScreen } from "@/features/review/ReviewScreen";
 import { EntriesScreen } from "@/features/entries/EntriesScreen";
+import { EntryScreen } from "@/features/entries/EntryScreen";
 import { ImportScreen } from "@/features/import/ImportScreen";
+import { BatchScreen } from "@/features/import/BatchScreen";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { Diagnostics } from "@/features/settings/Diagnostics";
 
@@ -19,7 +21,9 @@ function Shell() {
         <Route path="/" element={<TodayScreen />} />
         <Route path="/review" element={<ReviewScreen />} />
         <Route path="/entries" element={<EntriesScreen />} />
+        <Route path="/entries/:id" element={<EntryScreen />} />
         <Route path="/import" element={<ImportScreen />} />
+        <Route path="/import/batch/:id" element={<BatchScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/diagnostics" element={<Diagnostics />} />
         <Route path="*" element={<TodayScreen />} />

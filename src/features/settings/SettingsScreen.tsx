@@ -6,6 +6,7 @@ import { useSettings } from "@/app/useSettings";
 import type { PlaybackMode } from "@/core/types";
 import { exportBackup, importBackup, parseBackup, saveBackupFile } from "@/storage/backup";
 import type { VoiceInfo } from "@/audio/AudioPlayer";
+import { MODEL_CHOICES } from "@/llm/pricing";
 
 export function SettingsScreen() {
   const nav = useNavigate();
@@ -138,6 +139,52 @@ export function SettingsScreen() {
         >
           Test voice
         </Button>
+      </Card>
+
+      <Card className="mb-4">
+        <h2 className="mb-1 font-medium">Claude API</h2>
+        <p className="mb-2 text-sm text-muted">Used for photo, text and word imports and for in-app translation. The key stays on this phone.</p>
+        <input
+          type="password"
+          autoComplete="off"
+          className="mb-2 w-full rounded-lg bg-surface-2 px-3 py-2 text-sm"
+          placeholder="sk-ant-…"
+          defaultValue={settings.anthropicKey ?? ""}
+          onBlur={(e) => void update({ anthropicKey: e.target.value.trim() || undefined })}
+        />
+        <Row label="Model">
+          <select className="rounded-lg bg-surface-2 px-2 py-1" value={settings.model} onChange={(e) => void update({ model: e.target.value })}>
+            {MODEL_CHOICES.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </Row>
+        <Row label="Daily spend warning (USD)">
+          <input
+            type="number"
+            step={0.5}
+            inputMode="decimal"
+            className="w-20 rounded-lg bg-surface-2 px-2 py-1 text-right"
+            value={settings.dailySpendCapUsd}
+            onChange={(e) => void update({ dailySpendCapUsd: num(e.target.value, settings.dailySpendCapUsd) })}
+          />
+        </Row>
+        {settings.llmUsage && (
+          <p className="mt-1 text-xs text-muted">
+            {settings.llmUsage.month}: {settings.llmUsage.calls} calls · ${settings.llmUsage.usd.toFixed(2)} · today ${settings.llmUsage.todayUsd.toFixed(2)}
+          </p>
+        )}
+        <p className="mt-2 text-xs text-muted">OpenAI key (optional, for microphone transcription in Translate):</p>
+        <input
+          type="password"
+          autoComplete="off"
+          className="mt-1 w-full rounded-lg bg-surface-2 px-3 py-2 text-sm"
+          placeholder="sk-…"
+          defaultValue={settings.openaiKey ?? ""}
+          onBlur={(e) => void update({ openaiKey: e.target.value.trim() || undefined })}
+        />
       </Card>
 
       <Card className="mb-4">

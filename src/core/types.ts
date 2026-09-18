@@ -193,7 +193,7 @@ export interface EntryDraft {
   verb?: { irregular: boolean };
   sourceSentence?: { es: string; en: string; span?: [number, number] };
   generatedSentence?: { es: string; en: string; span?: [number, number]; verbForm?: string };
-  fromSentence?: { lemma: string; pos: Pos; gloss: string; span?: [number, number] }[];
+  fromSentence: { lemma: string; pos: Pos; gloss: string; span?: [number, number] }[];
   pageRef?: string;
 }
 
@@ -206,6 +206,8 @@ export interface Suggestion {
   existingEntryId?: string;
   didYouMean?: string;
   decision?: SuggestionDecision;
+  /** for fromSentences items: the suggestion whose generated sentence they came from */
+  parentSuggestionId?: string;
   createdAt: string;
 }
 
@@ -243,7 +245,26 @@ export interface Settings {
   seedVersion?: number;
   /** FSRS parameters (w); undefined = library defaults */
   fsrsWeights?: number[];
+  /** Token usage for the current month (cost meter) */
+  llmUsage?: LlmUsage;
+  /** Warn above this many USD per day; hard stop at twice this */
+  dailySpendCapUsd: number;
   updatedAt: string;
+}
+
+export interface LlmUsage {
+  /** YYYY-MM */
+  month: string;
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** estimated USD this month */
+  usd: number;
+  /** YYYY-MM-DD of `todayUsd` */
+  day: string;
+  todayUsd: number;
 }
 
 export interface OutboxRow {
@@ -267,5 +288,6 @@ export const DEFAULT_SETTINGS: Settings = {
   dayRolloverHour: 4,
   model: "claude-opus-5",
   speechRate: 0.95,
+  dailySpendCapUsd: 1,
   updatedAt: new Date(0).toISOString(),
 };
