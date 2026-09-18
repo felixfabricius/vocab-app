@@ -84,7 +84,12 @@ export function TodayScreen() {
         </div>
       </Card>
 
-      <p className="text-center text-sm text-muted">{counts.total} entries in your collection</p>
+      <p className="text-center text-sm text-muted">
+        {counts.total} entries in your collection ·{" "}
+        <button className="underline" onClick={() => nav("/stats")}>
+          stats
+        </button>
+      </p>
     </Screen>
   );
 }

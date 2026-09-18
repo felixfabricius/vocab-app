@@ -6,7 +6,43 @@ import { newId, nowIso } from "@/core/ids";
 import { missingProductionCards } from "@/core/generator/cards";
 import type { Entry, Pos, Priority, Regional, Sense } from "@/core/types";
 import type { EntryBundle } from "@/storage/Repository";
-import { HighlightedSentence } from "@/features/review/CardView";
+import { HighlightedSentence, ParadigmTable } from "@/features/review/CardView";
+import { wantsParadigmCards } from "@/core/generator/paradigm";
+import { dropParadigmCards, ensureParadigmCards, getTensePlan, tenseLabel } from "@/features/grammar/tenseService";
+import { conjugate, loadVerbTable, type Conjugation, type TenseId } from "@/core/verbs";
+
+function ConjugationTables({ lemma, showVosotros }: { lemma: string; showVosotros: boolean }) {
+  const [rows, setRows] = useState<{ tense: string; conj: Conjugation }[]>([]);
+  const audio = getAudio();
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const [plan, table] = await Promise.all([getTensePlan(repo), loadVerbTable()]);
+      const out: { tense: string; conj: Conjugation }[] = [];
+      for (const r of plan.filter((p) => p.status === "active")) {
+        const conj = conjugate(table, lemma, r.tense as TenseId);
+        if (conj) out.push({ tense: r.tense, conj });
+      }
+      if (alive) setRows(out);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [lemma]);
+  if (rows.length === 0) return <p className="text-sm text-muted">No active tenses.</p>;
+  return (
+    <div className="space-y-3">
+      {rows.map((r) => (
+        <div key={r.tense}>
+          <div className="mb-1 text-sm text-accent">
+            {tenseLabel(r.tense)} {r.conj.source === "regular" && <span className="text-xs text-muted">· regular pattern</span>}
+          </div>
+          <ParadigmTable forms={r.conj.forms} showVosotros={showVosotros} onSpeak={(t) => void audio.speak(t)} />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const POS: Pos[] = ["noun", "verb", "adj", "adv", "phrase", "prep", "conj", "pron", "interj", "num", "other"];
 const PRIORITIES: Priority[] = ["essential", "core", "standard", "niche"];
@@ -16,7 +52,11 @@ export function EntryScreen() {
   const { id } = useParams();
   const nav = useNavigate();
   const [bundle, setBundle] = useState<EntryBundle | undefined>();
+  const [showVosotros, setShowVosotros] = useState(true);
   const audio = getAudio();
+  useEffect(() => {
+    void repo.getSettings().then((s) => setShowVosotros(s.showVosotros));
+  }, []);
 
   const load = useCallback(async () => {
     if (id) setBundle(await repo.getBundle(id));
@@ -66,6 +106,14 @@ export function EntryScreen() {
     const { newFsrsState } = await import("@/core/scheduler/fsrs");
     const at = nowIso();
     await repo.putCards(cards.map((c) => ({ ...c, fsrs: newFsrsState(new Date()), introducedOn: undefined, updatedAt: at })));
+    await load();
+  }
+
+  async function setParadigmMode(mode: "auto" | "on" | "off") {
+    const next: Entry = { ...entry, verb: { irregular: entry.verb?.irregular ?? false, paradigmCards: mode }, updatedAt: nowIso() };
+    await repo.putEntry(next);
+    if (wantsParadigmCards(next)) await ensureParadigmCards(repo, [next]);
+    else await dropParadigmCards(repo, next);
     await load();
   }
 
@@ -178,6 +226,24 @@ export function EntryScreen() {
           })}
         </ul>
       </Card>
+
+      {entry.pos === "verb" && (
+        <Card className="mb-4">
+          <h2 className="mb-2 font-medium">Conjugation</h2>
+          <Row label="Paradigm cards">
+            <select
+              className="rounded-lg bg-surface-2 px-2 py-1"
+              value={entry.verb?.paradigmCards ?? "auto"}
+              onChange={(e) => void setParadigmMode(e.target.value as "auto" | "on" | "off")}
+            >
+              <option value="auto">auto (rules)</option>
+              <option value="on">on</option>
+              <option value="off">off</option>
+            </select>
+          </Row>
+          <ConjugationTables lemma={entry.lemma} showVosotros={showVosotros} />
+        </Card>
+      )}
 
       <Card className="mb-4">
         <h2 className="mb-2 font-medium">Cards</h2>

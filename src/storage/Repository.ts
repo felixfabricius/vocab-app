@@ -43,6 +43,8 @@ export interface Repository {
   putSentences(sentences: Sentence[]): Promise<void>;
   putEncounters(encounters: Encounter[]): Promise<void>;
   sentencesForEntry(entryId: string): Promise<{ sentence: Sentence; encounter: Encounter }[]>;
+  /** Active entry ids that have no sentence at all (candidates for enrichment). */
+  entryIdsWithoutSentences(): Promise<string[]>;
   trashEntry(entryId: string, at: string): Promise<void>;
   restoreEntry(entryId: string, at: string): Promise<void>;
   purgeTrashedBefore(iso: string): Promise<number>;

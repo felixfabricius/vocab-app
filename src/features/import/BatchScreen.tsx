@@ -5,6 +5,8 @@ import { repo } from "@/app/services";
 import type { ImportBatch, Suggestion, SuggestionGroup } from "@/core/types";
 import { priorityClass } from "@/features/entries/EntriesScreen";
 import { acceptBatch, ignoreSuggestion } from "./importService";
+import { enrichEntryIds } from "@/features/entries/enrichService";
+import { draftContext, llmEnv } from "@/app/llmEnv";
 import { SuggestionEditor } from "./SuggestionEditor";
 
 const GROUPS: { id: SuggestionGroup; label: string }[] = [
@@ -21,6 +23,7 @@ export function BatchScreen() {
   const [editing, setEditing] = useState<Suggestion | undefined>();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | undefined>();
+  const [bare, setBare] = useState<string[] | undefined>();
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -70,9 +73,27 @@ export function BatchScreen() {
       const r = await acceptBatch(repo, id!);
       setMsg(`${r.created} entries created, ${r.attached} existing entries updated`);
       await load();
-      setTimeout(() => nav("/import"), 800);
+      if (r.bareIds.length > 0) setBare(r.bareIds);
+      else setTimeout(() => nav("/import"), 800);
     } catch (e) {
       setMsg(`Accept failed: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function enrich() {
+    if (!bare) return;
+    setBusy(true);
+    try {
+      const ctx = await draftContext();
+      const r = await enrichEntryIds(repo, llmEnv, ctx, bare);
+      setMsg(`${r.enriched} entries enriched, ${r.sentencesAdded} sentences added ($${r.usd.toFixed(3)})`);
+      setBare(undefined);
+      if (r.childBatchId) setTimeout(() => nav(`/import/batch/${r.childBatchId}`), 800);
+      else setTimeout(() => nav("/import"), 800);
+    } catch (e) {
+      setMsg(`Enrich failed: ${(e as Error).message}`);
     } finally {
       setBusy(false);
     }
@@ -100,7 +121,21 @@ export function BatchScreen() {
 
       {batch.stage === "done" ? (
         <Card>
-          <p className="text-muted">This batch has been processed.</p>
+          {bare && bare.length > 0 ? (
+            <>
+              <p className="mb-3 text-sm text-muted">{bare.length} new entries have no example sentence yet. Claude can add sentences, gender, notes and priority.</p>
+              <div className="flex gap-2">
+                <Button className="flex-1" disabled={busy} onClick={() => nav("/import")}>
+                  Later
+                </Button>
+                <Button variant="primary" className="flex-[2]" disabled={busy} onClick={() => void enrich()}>
+                  {busy ? "Enriching…" : `Enrich ${bare.length} with Claude`}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="text-muted">This batch has been processed.</p>
+          )}
         </Card>
       ) : (
         <>

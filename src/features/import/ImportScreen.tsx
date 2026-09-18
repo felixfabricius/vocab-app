@@ -7,10 +7,13 @@ import { useSettings } from "@/app/useSettings";
 import { parsePasteImport, parseTsvLines } from "@/core/import/paste";
 import { draftsFromTranslateLog, parseTranslateLog } from "@/core/import/translateLog";
 import type { ImportBatch } from "@/core/types";
+import { enrichEntryIds } from "@/features/entries/enrichService";
 import { prepareImage } from "@/llm/image";
-import { draftFromImage, draftFromText, draftManual } from "@/llm/pipelines";
+import { draftFromImage, draftFromText, draftManual, scanText, SCAN_THRESHOLD_WORDS } from "@/llm/pipelines";
+import type { EntryDraft } from "@/core/types";
 import { buildExtractPrompt } from "@/llm/prompts/extract";
 import { createBatch } from "./importService";
+import { loadFrequency } from "@/core/priority/frequency";
 
 type Busy = { label: string } | undefined;
 
@@ -24,6 +27,7 @@ export function ImportScreen() {
   const [word, setWord] = useState("");
   const [pageRef, setPageRef] = useState("");
   const [batches, setBatches] = useState<ImportBatch[]>([]);
+  const [bareCount, setBareCount] = useState(0);
   const cameraInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const logInput = useRef<HTMLInputElement>(null);
@@ -32,6 +36,16 @@ export function ImportScreen() {
 
   async function refreshBatches() {
     setBatches(await repo.listBatches());
+    setBareCount((await repo.entryIdsWithoutSentences()).length);
+  }
+
+  async function onEnrichAll() {
+    await run("Enrich", async () => {
+      const ids = await repo.entryIdsWithoutSentences();
+      const ctx = await draftContext();
+      const r = await enrichEntryIds(repo, llmEnv, ctx, ids.slice(0, 60));
+      return { ...(r.childBatchId ? { batchId: r.childBatchId } : {}), message: `${r.enriched} entries enriched, ${r.sentencesAdded} sentences added ($${r.usd.toFixed(3)})` };
+    });
   }
   useEffect(() => {
     void refreshBatches();
@@ -64,6 +78,7 @@ export function ImportScreen() {
         ...(pageRef ? { pageRef } : {}),
         imageHash: img.hash,
         drafts: out.drafts.map((d) => (pageRef && !d.pageRef ? { ...d, pageRef } : d)),
+        frequency: await loadFrequency(),
       });
       return { batchId: batch.id, message: `${out.drafts.length} items drafted for $${out.usd.toFixed(3)}` };
     });
@@ -81,6 +96,7 @@ export function ImportScreen() {
         label: `Paste ${new Date().toLocaleString()}`,
         ...(pageRef ? { pageRef } : {}),
         drafts: parsed.items,
+        frequency: await loadFrequency(),
       });
       const errs = parsed.errors.length ? ` (${parsed.errors.length} items skipped: ${parsed.errors.map((e) => e.message).join("; ")})` : "";
       setPaste("");
@@ -91,9 +107,28 @@ export function ImportScreen() {
   async function onText() {
     await run("Text import", async () => {
       const ctx = await draftContext();
+      const words = text.trim().split(/\s+/).length;
+      if (words > SCAN_THRESHOLD_WORDS) {
+        // Long text: scan for candidates first; accepted ones are enriched afterwards.
+        const scan = await scanText(llmEnv, ctx, text, { sourceHint: "a long text, possibly subtitles" });
+        if (scan.candidates.length === 0) return { message: "No candidates found." };
+        const drafts: EntryDraft[] = scan.candidates.map((c) => ({
+          lemma: c.lemma,
+          pos: c.pos,
+          isPhrase: c.isPhrase || c.pos === "phrase",
+          senses: [{ gloss: c.gloss }],
+          priority: c.priority,
+          regional: "neutral",
+          fromSentence: [],
+          ...(scan.lines[c.lineIndex] ? { sourceSentence: { es: scan.lines[c.lineIndex]!, en: "" } } : {}),
+        }));
+        const batch = await createBatch(repo, { sourceType: "text", label: `Scan ${new Date().toLocaleString()}`, drafts, frequency: await loadFrequency() });
+        setText("");
+        return { batchId: batch.id, message: `${drafts.length} candidates for $${scan.usd.toFixed(3)}. Accept the ones you want, then enrich.` };
+      }
       const out = await draftFromText(llmEnv, ctx, text);
       if (out.drafts.length === 0) return { message: "No vocabulary found." };
-      const batch = await createBatch(repo, { sourceType: "text", label: `Text ${new Date().toLocaleString()}`, drafts: out.drafts });
+      const batch = await createBatch(repo, { sourceType: "text", label: `Text ${new Date().toLocaleString()}`, drafts: out.drafts, frequency: await loadFrequency() });
       setText("");
       return { batchId: batch.id, message: `${out.drafts.length} items drafted for $${out.usd.toFixed(3)}` };
     });
@@ -104,7 +139,7 @@ export function ImportScreen() {
       const parsed = parseTranslateLog(await file.text());
       const drafts = draftsFromTranslateLog(parsed.rows);
       if (drafts.length === 0) return { message: `No new items. ${parsed.errors.join("; ")}` };
-      const batch = await createBatch(repo, { sourceType: "translate", label: `Translate log ${new Date().toLocaleDateString()}`, drafts });
+      const batch = await createBatch(repo, { sourceType: "translate", label: `Translate log ${new Date().toLocaleDateString()}`, drafts, frequency: await loadFrequency() });
       return { batchId: batch.id, message: `${drafts.length} items from ${parsed.rows.length} lookups` };
     });
   }
@@ -114,7 +149,7 @@ export function ImportScreen() {
       const ctx = await draftContext();
       const out = await draftManual(llmEnv, ctx, word.trim());
       if (out.drafts.length === 0) return { message: "Nothing drafted." };
-      const batch = await createBatch(repo, { sourceType: "manual", label: word.trim(), drafts: out.drafts });
+      const batch = await createBatch(repo, { sourceType: "manual", label: word.trim(), drafts: out.drafts, frequency: await loadFrequency() });
       setWord("");
       return { batchId: batch.id, message: `Drafted for $${out.usd.toFixed(3)}` };
     });
@@ -153,6 +188,18 @@ export function ImportScreen() {
         <div className="mb-3 rounded-xl bg-easy/10 p-3 text-sm text-easy">
           No Anthropic API key yet. Photo, text and word imports need one (Settings). Paste import works without it.
         </div>
+      )}
+
+      {bareCount > 0 && hasKey && (
+        <Card className="mb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm">
+              <div className="font-medium">{bareCount} entries without sentences</div>
+              <div className="text-muted">Add examples, gender, notes with Claude (max 60 per run).</div>
+            </div>
+            <Button disabled={!!busy} onClick={() => void onEnrichAll()}>Enrich</Button>
+          </div>
+        </Card>
       )}
 
       {open.length > 0 && (

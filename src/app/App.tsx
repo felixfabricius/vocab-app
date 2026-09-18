@@ -13,6 +13,7 @@ import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { Diagnostics } from "@/features/settings/Diagnostics";
 import { GrammarScreen } from "@/features/grammar/GrammarScreen";
 import { TranslateScreen } from "@/features/translate/TranslateScreen";
+import { StatsScreen } from "@/features/stats/StatsScreen";
 
 function Shell() {
   const location = useLocation();
@@ -28,6 +29,7 @@ function Shell() {
         <Route path="/import/batch/:id" element={<BatchScreen />} />
         <Route path="/translate" element={<TranslateScreen />} />
         <Route path="/grammar" element={<GrammarScreen />} />
+        <Route path="/stats" element={<StatsScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/diagnostics" element={<Diagnostics />} />
         <Route path="*" element={<TodayScreen />} />
@@ -42,9 +44,17 @@ export function App() {
   const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
-    seedIfNeeded(repo)
-      .catch((e: unknown) => setError(String(e)))
-      .finally(() => setReady(true));
+    (async () => {
+      try {
+        await seedIfNeeded(repo);
+        // 30-day trash: purge entries trashed more than 30 days ago.
+        await repo.purgeTrashedBefore(new Date(Date.now() - 30 * 86_400_000).toISOString());
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setReady(true);
+      }
+    })();
   }, []);
 
   if (!ready) return <Spinner label="Preparing…" />;

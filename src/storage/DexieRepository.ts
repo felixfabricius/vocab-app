@@ -125,6 +125,15 @@ export class DexieRepository implements Repository {
     return out;
   }
 
+  async entryIdsWithoutSentences() {
+    const [entries, encounters] = await Promise.all([
+      this.db.entries.where("status").equals("active").toArray(),
+      this.db.encounters.toArray(),
+    ]);
+    const has = new Set(encounters.map((e) => e.entryId));
+    return entries.filter((e) => !has.has(e.id)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).map((e) => e.id);
+  }
+
   async trashEntry(entryId: string, at: string) {
     await this.db.transaction("rw", this.db.entries, this.db.cards, async () => {
       await this.db.entries.update(entryId, { status: "trashed", deletedAt: at, updatedAt: at });

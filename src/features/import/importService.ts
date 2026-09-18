@@ -118,6 +118,10 @@ export async function createBatch(repo: Repository, input: CreateBatchInput): Pr
 export interface AcceptResult {
   created: number;
   attached: number;
+  /** ids of newly created entries */
+  createdIds: string[];
+  /** created entries that have no sentence (candidates for enrichment) */
+  bareIds: string[];
 }
 
 /** Create entries for every checked, undecided suggestion in the batch; attach encounters to existing entries. */
@@ -246,7 +250,13 @@ export async function acceptBatch(repo: Repository, batchId: string): Promise<Ac
   await repo.putSuggestions(updated);
   await repo.putBatch({ ...batch, stage: "done", updatedAt: nowIso() });
   await ensureParadigmCards(repo, newEntries);
-  return { created, attached };
+  const withSentence = new Set(newEncounters.map((e) => e.entryId));
+  return {
+    created,
+    attached,
+    createdIds: newEntries.map((e) => e.id),
+    bareIds: newEntries.filter((e) => !withSentence.has(e.id)).map((e) => e.id),
+  };
 }
 
 export async function ignoreSuggestion(repo: Repository, s: Suggestion): Promise<void> {
