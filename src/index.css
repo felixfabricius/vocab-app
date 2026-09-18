@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-surface-2: #334155;
+  --color-text: #f1f5f9;
+  --color-muted: #94a3b8;
+  --color-accent: #38bdf8;
+  --color-good: #4ade80;
+  --color-again: #f87171;
+  --color-easy: #a78bfa;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
+/* Safe-area aware full-height layout for the installed app */
+.app-shell {
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
