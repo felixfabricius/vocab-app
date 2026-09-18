@@ -78,6 +78,12 @@ const outboxMiddleware: Middleware<DBCore> = {
   create(core) {
     return {
       ...core,
+      // Every read-write transaction also covers the outbox so the mirror write
+      // below stays inside the same transaction (implicit ones included).
+      transaction(stores, mode, options) {
+        const widened = mode === "readwrite" && !stores.includes("outbox") ? [...stores, "outbox"] : stores;
+        return core.transaction(widened, mode, options);
+      },
       table(name) {
         const table = core.table(name);
         if (!TRACKED.has(name)) return table;
