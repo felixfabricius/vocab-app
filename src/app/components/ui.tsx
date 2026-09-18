@@ -53,6 +53,7 @@ const tabs: { to: string; label: string; icon: string }[] = [
   { to: "/", label: "Today", icon: "◎" },
   { to: "/entries", label: "Words", icon: "≡" },
   { to: "/import", label: "Import", icon: "＋" },
+  { to: "/translate", label: "Translate", icon: "⇄" },
   { to: "/settings", label: "Settings", icon: "⚙" },
 ];
 

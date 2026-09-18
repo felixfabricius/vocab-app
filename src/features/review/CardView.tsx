@@ -1,5 +1,14 @@
 import type { ReactNode } from "react";
+import { LANGUAGE } from "@/config/language";
 import type { Encounter, Entry, Sense, Sentence } from "@/core/types";
+import type { Forms } from "@/core/verbs";
+
+export interface ParadigmContent {
+  tense: string;
+  tenseLabel: string;
+  forms: Forms;
+  source: "table" | "regular";
+}
 
 export interface CardContent {
   entry: Entry;
@@ -7,6 +16,7 @@ export interface CardContent {
   allSenses: Sense[];
   sentence?: Sentence;
   encounter?: Encounter;
+  paradigm?: ParadigmContent;
 }
 
 /** Highlight the encounter span inside the Spanish sentence. */
@@ -31,6 +41,17 @@ function PosTag({ entry }: { entry: Entry }) {
 }
 
 export function CardFront({ content, showHint, onToggleHint }: { content: CardContent; showHint: boolean; onToggleHint: () => void }) {
+  if (content.paradigm) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+        <span className="text-xs uppercase tracking-wide text-muted">conjugation</span>
+        <div className="text-4xl font-semibold">{content.entry.lemma}</div>
+        <div className="text-xl text-accent">{content.paradigm.tenseLabel}</div>
+        <div className="mt-2 text-sm text-muted">recite every person, then reveal</div>
+        <div className="absolute bottom-6 text-xs text-muted">tap to reveal</div>
+      </div>
+    );
+  }
   const gloss = content.sense ? content.sense.gloss : content.allSenses.map((s) => s.gloss).join("; ");
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
@@ -52,8 +73,42 @@ export function CardFront({ content, showHint, onToggleHint }: { content: CardCo
   );
 }
 
-export function CardBack({ content, onSpeak }: { content: CardContent; onSpeak: (text: string) => void }) {
+export function ParadigmTable({ forms, showVosotros, onSpeak }: { forms: Forms; showVosotros: boolean; onSpeak?: (text: string) => void }) {
+  return (
+    <table className="w-full max-w-xs text-left">
+      <tbody>
+        {LANGUAGE.persons.map((p, i) => {
+          const form = forms[i];
+          if (!form) return null;
+          if (p.regionalNote && !showVosotros) return null;
+          return (
+            <tr key={p.id} className={p.regionalNote ? "text-muted" : ""} onClick={() => onSpeak?.(form)}>
+              <td className="py-1 pr-3 text-sm text-muted">
+                {p.label}
+                {p.regionalNote && <span className="ml-1 rounded bg-surface-2 px-1 text-[10px]">{p.regionalNote}</span>}
+              </td>
+              <td className="py-1 text-lg font-medium">{form}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+export function CardBack({ content, showVosotros, onSpeak }: { content: CardContent; showVosotros: boolean; onSpeak: (text: string) => void }) {
   const { entry, sentence, encounter } = content;
+  if (content.paradigm) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+        <div className="text-2xl font-semibold">
+          {entry.lemma} <span className="text-base text-accent">· {content.paradigm.tenseLabel}</span>
+        </div>
+        <ParadigmTable forms={content.paradigm.forms} showVosotros={showVosotros} onSpeak={onSpeak} />
+        {content.paradigm.source === "regular" && <div className="text-xs text-muted">regular pattern</div>}
+      </div>
+    );
+  }
   const head = entry.pos === "noun" && entry.article ? `${entry.article} ${entry.lemma}` : entry.lemma;
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
@@ -91,4 +146,14 @@ function Speakable({ children, onSpeak }: { children: ReactNode; onSpeak: () => 
       {children}
     </div>
   );
+}
+
+/** Text to read aloud for the back of a card. */
+export function spokenBack(content: CardContent, showVosotros: boolean): string[] {
+  if (content.paradigm) {
+    return content.paradigm.forms.filter((f, i) => f && (showVosotros || !LANGUAGE.persons[i]?.regionalNote)).map((f) => f);
+  }
+  const out = [content.entry.lemma];
+  if (content.sentence) out.push(content.sentence.es);
+  return out;
 }

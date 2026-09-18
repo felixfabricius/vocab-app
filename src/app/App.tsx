@@ -11,6 +11,8 @@ import { ImportScreen } from "@/features/import/ImportScreen";
 import { BatchScreen } from "@/features/import/BatchScreen";
 import { SettingsScreen } from "@/features/settings/SettingsScreen";
 import { Diagnostics } from "@/features/settings/Diagnostics";
+import { GrammarScreen } from "@/features/grammar/GrammarScreen";
+import { TranslateScreen } from "@/features/translate/TranslateScreen";
 
 function Shell() {
   const location = useLocation();
@@ -24,6 +26,8 @@ function Shell() {
         <Route path="/entries/:id" element={<EntryScreen />} />
         <Route path="/import" element={<ImportScreen />} />
         <Route path="/import/batch/:id" element={<BatchScreen />} />
+        <Route path="/translate" element={<TranslateScreen />} />
+        <Route path="/grammar" element={<GrammarScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/diagnostics" element={<Diagnostics />} />
         <Route path="*" element={<TodayScreen />} />

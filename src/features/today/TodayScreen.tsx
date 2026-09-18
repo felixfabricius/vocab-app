@@ -74,6 +74,16 @@ export function TodayScreen() {
         </div>
       </Card>
 
+      <Card className="mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium">Grammar</div>
+            <div className="text-sm text-muted">Activate tenses, conjugation cards</div>
+          </div>
+          <Button onClick={() => nav("/grammar")}>Open</Button>
+        </div>
+      </Card>
+
       <p className="text-center text-sm text-muted">{counts.total} entries in your collection</p>
     </Screen>
   );

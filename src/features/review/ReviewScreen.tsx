@@ -7,7 +7,9 @@ import { buildSession } from "@/core/scheduler/session";
 import { dayEnd } from "@/core/scheduler/day";
 import * as rs from "@/core/review/session";
 import type { Entry, GradeName, Settings } from "@/core/types";
-import { CardBack, CardFront, type CardContent } from "./CardView";
+import { conjugate, loadVerbTable, type TenseId } from "@/core/verbs";
+import { tenseLabel } from "@/features/grammar/tenseService";
+import { CardBack, CardFront, spokenBack, type CardContent } from "./CardView";
 import { useSwipe, type SwipeDir } from "./useSwipe";
 
 type Phase = "loading" | "reviewing" | "done";
@@ -45,6 +47,7 @@ export function ReviewScreen() {
       if (!alive) return;
       setSettings(s);
       setEntries(ents);
+      audio.setVoice(s.voiceURI);
       const initial = rs.createReviewState([...session.due, ...session.fresh], session.learning);
       const env0: rs.ReviewEnv = {
         now: () => new Date(),
@@ -92,6 +95,12 @@ export function ReviewScreen() {
         ...(sentence ? { sentence } : {}),
         ...(encounter ? { encounter } : {}),
       };
+      if (current.type === "paradigm" && current.tense) {
+        const table = await loadVerbTable();
+        const conj = conjugate(table, bundle.entry.lemma, current.tense as TenseId);
+        if (conj) c.paradigm = { tense: current.tense, tenseLabel: tenseLabel(current.tense), forms: conj.forms, source: conj.source };
+      }
+      if (!alive) return;
       contentCache.current.set(current.id, c);
       setContent(c);
     })();
@@ -110,10 +119,10 @@ export function ReviewScreen() {
     async (c: CardContent) => {
       if (!settings || settings.playback === "display") return;
       const rate = settings.speechRate;
-      await audio.speak(c.entry.lemma, { rate });
-      if (c.sentence) {
-        await new Promise((r) => setTimeout(r, 500));
-        await audio.speak(c.sentence.es, { rate });
+      const parts = spokenBack(c, settings.showVosotros);
+      for (let i = 0; i < parts.length; i++) {
+        if (i > 0) await new Promise((r) => setTimeout(r, c.paradigm ? 250 : 500));
+        await audio.speak(parts[i]!, { rate });
       }
     },
     [audio, settings],
@@ -200,6 +209,7 @@ export function ReviewScreen() {
   const tilt = Math.max(-12, Math.min(12, dx / 12));
   const hint = state.flipped ? (dx > 40 ? "good" : dx < -40 ? "again" : dy < -40 ? "easy" : undefined) : undefined;
   const hintColor = hint === "good" ? "border-good" : hint === "again" ? "border-again" : hint === "easy" ? "border-easy" : "border-transparent";
+  const speak = (t: string) => void audio.speak(t, { rate: settings.speechRate });
 
   return (
     <div className="no-select mx-auto flex min-h-full max-w-md flex-col px-4 pb-4 pt-2">
@@ -223,7 +233,7 @@ export function ReviewScreen() {
         {!content ? (
           <Spinner />
         ) : state.flipped ? (
-          <CardBack content={content} onSpeak={(t) => void audio.speak(t, { rate: settings.speechRate })} />
+          <CardBack content={content} showVosotros={settings.showVosotros} onSpeak={speak} />
         ) : (
           <CardFront content={content} showHint={showHint} onToggleHint={() => setShowHint((v) => !v)} />
         )}
@@ -257,8 +267,13 @@ export function ReviewScreen() {
           Skip today
         </button>
         {content && (
-          <button className="px-2 py-1" onClick={() => void audio.speak(content.entry.lemma, { rate: settings.speechRate })}>
+          <button className="px-2 py-1" onClick={() => void speakBack(content)}>
             🔊 Play
+          </button>
+        )}
+        {content && (
+          <button className="px-2 py-1" onClick={() => nav(`/entries/${content.entry.id}`)}>
+            ✎ Edit
           </button>
         )}
       </div>

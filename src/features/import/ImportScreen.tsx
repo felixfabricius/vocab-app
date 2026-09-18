@@ -5,6 +5,7 @@ import { repo } from "@/app/services";
 import { draftContext, llmEnv } from "@/app/llmEnv";
 import { useSettings } from "@/app/useSettings";
 import { parsePasteImport, parseTsvLines } from "@/core/import/paste";
+import { draftsFromTranslateLog, parseTranslateLog } from "@/core/import/translateLog";
 import type { ImportBatch } from "@/core/types";
 import { prepareImage } from "@/llm/image";
 import { draftFromImage, draftFromText, draftManual } from "@/llm/pipelines";
@@ -25,6 +26,7 @@ export function ImportScreen() {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const cameraInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const logInput = useRef<HTMLInputElement>(null);
 
   const hasKey = !!settings?.anthropicKey;
 
@@ -94,6 +96,16 @@ export function ImportScreen() {
       const batch = await createBatch(repo, { sourceType: "text", label: `Text ${new Date().toLocaleString()}`, drafts: out.drafts });
       setText("");
       return { batchId: batch.id, message: `${out.drafts.length} items drafted for $${out.usd.toFixed(3)}` };
+    });
+  }
+
+  async function onTranslateLog(file: File) {
+    await run("Translate log import", async () => {
+      const parsed = parseTranslateLog(await file.text());
+      const drafts = draftsFromTranslateLog(parsed.rows);
+      if (drafts.length === 0) return { message: `No new items. ${parsed.errors.join("; ")}` };
+      const batch = await createBatch(repo, { sourceType: "translate", label: `Translate log ${new Date().toLocaleDateString()}`, drafts });
+      return { batchId: batch.id, message: `${drafts.length} items from ${parsed.rows.length} lookups` };
     });
   }
 
@@ -212,6 +224,17 @@ export function ImportScreen() {
         <Button variant="primary" className="w-full" disabled={!hasKey || !text.trim() || !!busy} onClick={() => void onText()}>
           Extract vocabulary
         </Button>
+      </Card>
+
+      <Card className="mb-4">
+        <h2 className="mb-2 font-medium">Translate log</h2>
+        <p className="mb-3 text-sm text-muted">
+          The file the lock-screen Shortcuts write: iCloud Drive › Shortcuts › vocab-import › translate-log.jsonl. Works without an API key.
+        </p>
+        <Button className="w-full" disabled={!!busy} onClick={() => logInput.current?.click()}>
+          Choose translate-log.jsonl
+        </Button>
+        <input ref={logInput} type="file" accept=".jsonl,.txt,.json,text/plain,application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onTranslateLog(f); e.target.value = ""; }} />
       </Card>
 
       <Card className="mb-4">

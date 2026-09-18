@@ -20,6 +20,7 @@ import type {
   Suggestion,
 } from "@/core/types";
 import type { Repository } from "@/storage/Repository";
+import { ensureParadigmCards } from "@/features/grammar/tenseService";
 
 export interface CreateBatchInput {
   sourceType: SourceType;
@@ -244,6 +245,7 @@ export async function acceptBatch(repo: Repository, batchId: string): Promise<Ac
   await repo.putCards(newCards);
   await repo.putSuggestions(updated);
   await repo.putBatch({ ...batch, stage: "done", updatedAt: nowIso() });
+  await ensureParadigmCards(repo, newEntries);
   return { created, attached };
 }
 

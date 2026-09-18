@@ -28,3 +28,6 @@ Thumbs.db
 
 # test / coverage
 coverage/
+
+# downloaded reference data (rebuilt by scripts/)
+.cache/
