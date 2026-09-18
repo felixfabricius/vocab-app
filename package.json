@@ -11,7 +11,7 @@
     "dev": "vite --host",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview --host",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "icons": "node scripts/make-icons.mjs",
