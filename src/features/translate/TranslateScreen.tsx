@@ -66,8 +66,14 @@ function Panel({ dir, title, settings, autoFocus, history, onLookup }: { dir: Di
     if (native) void packStatus(dir).then(setPack).catch(() => setPack("unsupported"));
   }, [dir, native]);
 
+  // Deep link with focus=1: focus the field. WKWebView shows the keyboard only after a tap (tracker T8).
   useEffect(() => {
-    if (autoFocus) field.current?.focus();
+    if (!autoFocus) return;
+    const t = setTimeout(() => {
+      field.current?.focus();
+      field.current?.scrollIntoView({ block: "center" });
+    }, 150);
+    return () => clearTimeout(t);
   }, [autoFocus]);
 
   async function log(translation: string, provider: "apple" | "claude", claude?: TranslateOutput) {

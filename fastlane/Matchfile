@@ -3,4 +3,4 @@
 git_url("https://github.com/felixfabricius/ios-certificates.git")
 storage_mode("git")
 type("appstore")
-app_identifier(["in.fabricius.vocab"])
+app_identifier(["in.fabricius.vocab", "in.fabricius.vocab.widgets"])

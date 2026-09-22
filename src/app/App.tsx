@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router";
+import { installDeepLinks } from "@/native/deepLinks";
 import { App as CapApp } from "@capacitor/app";
 import { NavBar, Spinner } from "./components/ui";
 import { getCloudSync, repo } from "./services";
@@ -19,7 +20,14 @@ import { StatsScreen } from "@/features/stats/StatsScreen";
 
 function Shell() {
   const location = useLocation();
+  const navigate = useNavigate();
   const hideNav = location.pathname.startsWith("/review");
+
+  // Widgets and controls open alaluna:// links (M6).
+  useEffect(() => {
+    if (!isNative()) return;
+    return installDeepLinks((route) => navigate(route));
+  }, [navigate]);
   return (
     <div className="app-shell">
       <Routes>

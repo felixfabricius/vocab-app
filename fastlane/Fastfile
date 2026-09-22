@@ -3,7 +3,12 @@ default_platform(:ios)
 
 PROJECT = "ios/App/App.xcodeproj"
 APP_ID = "in.fabricius.vocab"
-APP_IDS = [APP_ID] # M6: + "in.fabricius.vocab.widgets"
+WIDGETS_ID = "in.fabricius.vocab.widgets"
+TARGETS = { "App" => APP_ID, "ALaLunaWidgets" => WIDGETS_ID }
+
+def profile_name(id)
+  ENV.fetch("sigh_#{id}_appstore_profile-name")
+end
 
 platform :ios do
   desc "Build, sign with match, upload to TestFlight (internal testing)"
@@ -19,21 +24,23 @@ platform :ios do
 
     match(
       type: "appstore",
-      app_identifier: APP_IDS,
+      app_identifier: TARGETS.values,
       api_key: api_key,
       readonly: false,
       force: ENV["FORCE_MATCH"] == "true"
     )
 
-    update_code_signing_settings(
-      path: PROJECT,
-      use_automatic_signing: false,
-      team_id: ENV.fetch("APPLE_TEAM_ID"),
-      code_sign_identity: "Apple Distribution",
-      bundle_identifier: APP_ID,
-      targets: ["App"],
-      profile_name: ENV.fetch("sigh_#{APP_ID}_appstore_profile-name")
-    )
+    TARGETS.each do |target, id|
+      update_code_signing_settings(
+        path: PROJECT,
+        use_automatic_signing: false,
+        team_id: ENV.fetch("APPLE_TEAM_ID"),
+        code_sign_identity: "Apple Distribution",
+        bundle_identifier: id,
+        targets: [target],
+        profile_name: profile_name(id)
+      )
+    end
 
     increment_build_number(xcodeproj: PROJECT, build_number: ENV.fetch("BUILD_NUMBER"))
 
@@ -46,7 +53,7 @@ platform :ios do
       output_name: "ALaLuna.ipa",
       buildlog_path: "fastlane/logs",
       cloned_source_packages_path: "SourcePackages",
-      export_options: { provisioningProfiles: { APP_ID => ENV.fetch("sigh_#{APP_ID}_appstore_profile-name") } }
+      export_options: { provisioningProfiles: TARGETS.values.to_h { |id| [id, profile_name(id)] } }
     )
 
     upload_to_testflight(

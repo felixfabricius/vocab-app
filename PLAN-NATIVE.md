@@ -600,14 +600,15 @@ Items that proved too cumbersome from Windows + CI, plus ideas parked for later.
 
 | ID | Item | Milestone | Status | Tried / notes | Fallback or plan |
 |---|---|---|---|---|---|
-| T1 | Widget extension target without Xcode | M6 | open | — | xcodegen `project.yml`; Ruby `xcodeproj` script; rented Mac (add target once, commit) |
+| T1 | Widget extension target without Xcode | M6 | in progress | 2026-09-22: `ios/App/project.yml` written, CI generates the project; first build pending | Ruby `xcodeproj` script; rented Mac (add target once, commit) |
 | T2 | Entitlement or provisioning failures (iCloud, App Groups) that CI logs do not explain | M5/M6 | open | — | Rented Mac: open the project, Signing & Capabilities, one build |
 | T3 | Voice review level 2 (screen locked): keep-alive audio session, JS reliability when locked, or a native loop | after M7 | open | — | Native `ReviewLoopPlugin` (~300 lines) that owns the loop and calls back with grades |
 | T4 | Audio-session debugging (routing, interruptions, EarPods commands not arriving) | M7 | open | — | Rented Mac with the simulator console, or a Mac mini |
 | T5 | Safari Web Inspector session for a WKWebView-only bug | any | open | — | Rented Mac (MacinCloud pay-as-you-go), same Wi-Fi not required for the simulator |
 | T6 | Home-screen widget showing due counts (needs App Group data written by the app) | idea | open | Not requested in the spec | App Group entitlement + `UserDefaults(suiteName:)` written from `CloudFiles`-style plugin |
 | T7 | Multi-device sync over the change log | idea | open | Out of scope per spec §7 | Conflict rules beyond newer-`updatedAt`-wins |
-| T8 | Keyboard shown automatically on deep link | M6 | open | — | If the swizzle fails on iOS 26, accept one tap |
+| T8 | Keyboard shown automatically on deep link | M6 | deferred | 2026-09-22: the field is focused and scrolled into view; the private-API swizzle was not attempted blind | One tap shows the keyboard; try the swizzle in a rented-Mac session if it matters |
+| T9 | Remove the Shortcuts import path and `shortcuts/README.md` | M6 | open | Waits for the widgets and controls to be confirmed on the phone | Delete the translate-log card, `translateLogImportedUntil`, `core/import/translateLog.ts` (keep `draftFromLookupRow`) |
 
 ### 9.2 Decisions log
 
@@ -625,6 +626,9 @@ Items that proved too cumbersome from Windows + CI, plus ideas parked for later.
 | D10 | 2026-09-21 | No App Group entitlement until a widget shows data | The requested widgets and controls only deep-link; fewer entitlements to get right blind. |
 | D11 | 2026-09-21 | Translate screen loses "Add as card"; Claude's draft is stored on the lookup row | One path to cards (lookups → table) instead of two; nothing is lost because the stored draft is used by the lookups job. |
 | D12 | 2026-09-21 | Manual add without an API key requires both fields | A card without a gloss is useless; with a key, "Complete with AI" fills the other side. |
+| D13 | 2026-09-22 | App ID iCloud mode "Include CloudKit support (requires Xcode 6)" | The "Compatible with Xcode 5" mode yields profiles with only the old wildcard ubiquity entitlement; the modern `icloud-container-identifiers` / `icloud-services` entitlements the app declares need the Xcode 6 mode. CloudKit itself is not used. |
+| D14 | 2026-09-22 | Translation framework languages are resolved to regional identifiers in the plugin | `LanguageAvailability` lists `es-ES` and `en-US`; bare `es`/`en` failed on the phone. |
+| D15 | 2026-09-22 | xcodegen from M6 replaces the Ruby source-adding script | One declarative spec covers the app target and the widget extension. |
 
 ### 9.3 Questions that came up while planning (defaults chosen, change here if wrong)
 
