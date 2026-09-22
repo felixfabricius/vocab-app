@@ -47,7 +47,7 @@ export function PromptBuilderCard({ getContext, onCopied, paste, setPaste, onImp
       case "series":
         return series.trim() ? seriesPrompt(ctx, { series, season, episode, tag: t, targetCount: n, phrasePreference: phrases }) : undefined;
       case "textbook":
-        return book.trim() ? textbookPrompt(ctx, { book, page, tag: t }) : undefined;
+        return textbookPrompt(ctx, { book, page, tag: t });
       case "book":
         return book.trim() ? bookPrompt(ctx, { book, tag: t, density }) : undefined;
       case "context":
@@ -110,8 +110,8 @@ export function PromptBuilderCard({ getContext, onCopied, paste, setPaste, onImp
       )}
       {kind === "textbook" && (
         <div className="flex gap-2">
-          <input className={field} placeholder="Book" value={book} onChange={(e) => setBook(e.target.value)} />
-          <input className={`${field} w-24 flex-none`} placeholder="Page" value={page} onChange={(e) => setPage(e.target.value)} />
+          <input className={field} placeholder="Book (optional)" value={book} onChange={(e) => setBook(e.target.value)} />
+          <input className={`${field} w-24 flex-none`} placeholder="Page (opt.)" value={page} onChange={(e) => setPage(e.target.value)} />
         </div>
       )}
       {kind === "book" && (

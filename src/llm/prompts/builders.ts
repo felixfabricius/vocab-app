@@ -49,23 +49,26 @@ export function seriesPrompt(ctx: BuilderContext, f: SeriesFields): BuiltPrompt 
 }
 
 export interface TextbookFields {
-  book: string;
+  book?: string;
   page?: string;
   tag?: string;
 }
 
-export function textbookTag(f: TextbookFields): string {
-  return (f.tag?.trim() || [f.book.trim(), f.page ? `p. ${f.page.trim()}` : ""].filter(Boolean).join(" ")).trim();
+/** Book and page are optional; without them the tag is "textbook <date>". */
+export function textbookTag(f: TextbookFields, today = new Date()): string {
+  const fromFields = [f.book?.trim() ?? "", f.page?.trim() ? `p. ${f.page.trim()}` : ""].filter(Boolean).join(" ");
+  return (f.tag?.trim() || fromFields || `textbook ${today.toISOString().slice(0, 10)}`).trim();
 }
 
 export function textbookPrompt(ctx: BuilderContext, f: TextbookFields): BuiltPrompt {
   const tag = textbookTag(f);
+  const where = [f.book?.trim() ?? "", f.page?.trim() ? `page ${f.page.trim()}` : ""].filter(Boolean).join(", ");
   return {
     tag,
     prompt: buildExtractPrompt({
       format: "paste",
       ...ctx,
-      sourceHint: `a photo of a textbook page (${f.book.trim()}${f.page ? `, page ${f.page.trim()}` : ""}). Take everything on the page: vocabulary lists, dialogue, exercises. Glosses in English; German glosses are translated and dropped`,
+      sourceHint: `one or more photos of textbook pages${where ? ` (${where})` : ""}. Take everything on the pages: vocabulary lists, dialogue, exercises. Glosses in English; German glosses are translated and dropped`,
       batchTag: tag,
     }),
   };

@@ -24,6 +24,8 @@ describe("prompt builders", () => {
     expect(r.prompt).toContain("never output German");
     expect(r.prompt).toContain("Return every vocabulary item");
     expect(textbookTag({ book: "Aula 1" })).toBe("Aula 1");
+    expect(textbookTag({}, new Date("2026-09-22T12:00:00Z"))).toBe("textbook 2026-09-22");
+    expect(textbookPrompt(ctx, {}).prompt).toContain("one or more photos");
   });
 
   it("book: density guidance", () => {

@@ -22,12 +22,20 @@ export function routeForDeepLink(url: string): string | undefined {
   return undefined;
 }
 
-/** Cold start (launch URL) and warm start (appUrlOpen). Returns the unsubscribe function. */
+let launchUrlHandled = false;
+
+/**
+ * Cold start (launch URL, acted on once per process) and warm start (appUrlOpen).
+ * Returns the unsubscribe function.
+ */
 export function installDeepLinks(navigate: (route: string) => void): () => void {
-  void CapApp.getLaunchUrl().then((r) => {
-    const route = r?.url ? routeForDeepLink(r.url) : undefined;
-    if (route) navigate(route);
-  });
+  if (!launchUrlHandled) {
+    launchUrlHandled = true;
+    void CapApp.getLaunchUrl().then((r) => {
+      const route = r?.url ? routeForDeepLink(r.url) : undefined;
+      if (route) navigate(route);
+    });
+  }
   const handle = CapApp.addListener("appUrlOpen", ({ url }) => {
     const route = routeForDeepLink(url);
     if (route) navigate(route);

@@ -334,8 +334,8 @@ export function ReviewScreen() {
       )}
 
       <div
-        className={`relative flex flex-1 touch-none flex-col rounded-3xl border-4 bg-surface p-6 shadow-xl transition-transform ${hintColor} ${dragging ? "" : "duration-200"}`}
-        style={{ transform: `translateX(${dx}px) rotate(${tilt}deg)` }}
+        className={`relative flex flex-1 touch-none flex-col rounded-3xl border-4 bg-surface p-6 shadow-xl ${hintColor} ${dragging ? "" : "transition-transform duration-200"}`}
+        style={{ transform: `translateX(${dx}px) rotate(${tilt}deg)`, willChange: "transform" }}
         {...swipe.handlers}
       >
         {!content ? (

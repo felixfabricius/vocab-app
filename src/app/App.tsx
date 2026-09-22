@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router";
 import { installDeepLinks } from "@/native/deepLinks";
 import { App as CapApp } from "@capacitor/app";
@@ -23,11 +23,14 @@ function Shell() {
   const navigate = useNavigate();
   const hideNav = location.pathname.startsWith("/review");
 
-  // Widgets and controls open alaluna:// links (M6).
+  // Widgets and controls open alaluna:// links (M6). `navigate` changes identity on every
+  // route change, so the listener is installed once and reads the latest navigate via a ref.
+  const navRef = useRef(navigate);
+  navRef.current = navigate;
   useEffect(() => {
     if (!isNative()) return;
-    return installDeepLinks((route) => navigate(route));
-  }, [navigate]);
+    return installDeepLinks((route) => navRef.current(route));
+  }, []);
   return (
     <div className="app-shell">
       <Routes>

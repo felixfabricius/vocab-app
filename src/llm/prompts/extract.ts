@@ -79,6 +79,7 @@ export function buildExtractPrompt(o: ExtractPromptOptions): string {
     "",
     "## Input",
     o.sourceHint ? `The input is: ${o.sourceHint}.` : "The input is a photo or text containing Spanish.",
+    "Several photos are consecutive pages of the same source; read them all and return one combined list without duplicates.",
     o.situation
       ? `There is no source text. Invent the vocabulary and sentences a learner needs for this situation: ${o.situation}`
       : "It may mix Spanish with English or German (textbook glosses, translations). Use an adjacent English or German gloss as a hint for the meaning. Never create entries for English or German words. If the input is a two-column vocabulary list, one item per row.",
@@ -94,7 +95,7 @@ export function buildExtractPrompt(o: ExtractPromptOptions): string {
         ]
       : []),
     ...(o.density ? [DENSITY_TEXT[o.density]] : []),
-    "For nouns give `gender` and `article` (el/la). Give `plural` only when irregular. For verbs set `irregular`.",
+    "Every noun must have both `gender` (m/f) and `article` (el/la); never leave them null for a noun. Give `plural` only when irregular. For verbs set `irregular`.",
     "",
     "## Phrases",
     CHUNKING_TEXT[o.chunking],

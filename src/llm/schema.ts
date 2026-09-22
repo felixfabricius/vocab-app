@@ -122,6 +122,8 @@ function normalizeBase(d: z.infer<typeof DraftBaseSchema>): EntryDraft {
   };
   if (d.gender) out.gender = d.gender;
   if (d.article) out.article = d.article;
+  // LANG: the model sometimes gives a gender without the article; derive it.
+  if (d.pos === "noun" && !out.article && out.gender) out.article = out.gender === "f" ? "la" : "el";
   if (d.plural) out.plural = d.plural;
   if (d.cefr) out.cefr = d.cefr;
   if (d.usefulness != null) out.usefulness = d.usefulness;
