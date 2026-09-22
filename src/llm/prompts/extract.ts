@@ -63,11 +63,10 @@ const DENSITY_TEXT: Record<Density, string> = {
 
 export function buildExtractPrompt(o: ExtractPromptOptions): string {
   const known = o.knownLemmas.slice(0, 2000);
-  const cap = o.maxItems
-    ? `Return at most ${o.maxItems} items, the most useful first.`
-    : o.targetCount
-      ? `Aim for about ${o.targetCount} items, the most useful first; fewer is fine if the source has less, more if it is clearly richer.`
-      : "Return every vocabulary item on the page or in the text; do not cap.";
+  const limit = o.maxItems ?? o.targetCount;
+  const cap = limit
+    ? `Hard limit: ${limit} items, never more. Pick the ${limit} most useful first, then stop; fewer is fine when the source has less. Number the items with an \`n\` field starting at 1 and stop as soon as n reaches ${limit}.`
+    : "Return every vocabulary item on the page or in the text; do not cap.";
   const lines: string[] = [];
 
   lines.push(
@@ -140,9 +139,11 @@ export function buildExtractPrompt(o: ExtractPromptOptions): string {
         {
           marker: PASTE_HEADER,
           tag: o.batchTag ?? null,
+          limit: limit ?? null,
           notes: null,
           items: [
             {
+              n: 1,
               lemma: "hacer planes",
               pos: "phrase",
               isPhrase: true,
@@ -173,7 +174,7 @@ export function buildExtractPrompt(o: ExtractPromptOptions): string {
         2,
       ),
       "```",
-      `Every field must be present; use null when not applicable. Keep \`tag\` exactly as given${o.batchTag ? "" : " (null here)"}. \`pos\` is one of noun, verb, adj, adv, phrase, prep, conj, pron, interj, num, other. \`priority\` is essential, core, standard or niche. \`sentenceSource\` is "source" or "generated".`,
+      `Every field must be present; use null when not applicable. Keep \`tag\` and \`limit\` exactly as given${o.batchTag ? "" : " (tag is null here)"}; the app discards items beyond the limit. \`pos\` is one of noun, verb, adj, adv, phrase, prep, conj, pron, interj, num, other. \`priority\` is essential, core, standard or niche. \`sentenceSource\` is "source" or "generated".`,
     );
   }
 

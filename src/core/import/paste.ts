@@ -13,6 +13,8 @@ export interface ParseResult {
   notes?: string;
   /** batch-level tag from a v2 block */
   tag?: string;
+  /** items dropped because the block's `limit` was exceeded (the model lost count) */
+  truncated?: number;
 }
 
 /** Find the first JSON object in the text: inside a ```json fence if present, else the outermost braces. */
@@ -34,10 +36,15 @@ export function parsePasteImport(text: string): ParseResult {
   } catch (e) {
     return { items: [], errors: [{ index: -1, message: `Invalid JSON: ${(e as Error).message}` }] };
   }
-  const obj = parsed as { marker?: unknown; items?: unknown; notes?: unknown; tag?: unknown };
-  const rawItems = Array.isArray(obj.items) ? obj.items : Array.isArray(parsed) ? (parsed as unknown[]) : undefined;
+  const obj = parsed as { marker?: unknown; items?: unknown; notes?: unknown; tag?: unknown; limit?: unknown };
+  let rawItems = Array.isArray(obj.items) ? obj.items : Array.isArray(parsed) ? (parsed as unknown[]) : undefined;
   if (!rawItems) return { items: [], errors: [{ index: -1, message: "JSON has no `items` array." }] };
   const result: ParseResult = { items: [], errors: [] };
+  // The prompt asked for at most `limit` items, most useful first; enforce it here.
+  if (typeof obj.limit === "number" && obj.limit > 0 && rawItems.length > obj.limit) {
+    result.truncated = rawItems.length - obj.limit;
+    rawItems = rawItems.slice(0, obj.limit);
+  }
   if (typeof obj.marker === "string" && !ACCEPTED_MARKERS.includes(obj.marker)) {
     result.errors.push({ index: -1, message: `Unexpected marker ${obj.marker}; expected ${PASTE_HEADER}. Trying anyway.` });
   }

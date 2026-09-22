@@ -63,6 +63,14 @@ describe("parsePasteImport", () => {
     expect(b.isPhrase).toBe(true);
   });
 
+  it("enforces the block's limit when the model returns too many items", () => {
+    const items = ["uno", "dos", "tres"].map((l, i) => `{ "n": ${i + 1}, "lemma": "${l}", "pos": "num", "senses": ["${l}"] }`).join(",");
+    const r = parsePasteImport(`{ "marker": "VOCABAPP-IMPORT v2", "limit": 2, "items": [${items}] }`);
+    expect(r.items.map((i) => i.lemma)).toEqual(["uno", "dos"]);
+    expect(r.truncated).toBe(1);
+    expect(parsePasteImport(`{ "marker": "VOCABAPP-IMPORT v2", "limit": null, "items": [${items}] }`).items.length).toBe(3);
+  });
+
   it("fails cleanly without JSON", () => {
     const r = parsePasteImport("nothing here");
     expect(r.items).toEqual([]);

@@ -143,8 +143,9 @@ export function ImportScreen() {
         frequency: await loadFrequency(),
       });
       const errs = parsed.errors.length ? ` (${parsed.errors.length} items skipped: ${parsed.errors.map((e) => e.message).join("; ")})` : "";
+      const cut = parsed.truncated ? ` Claude returned ${parsed.items.length + parsed.truncated}; the first ${parsed.items.length} were kept (the block's limit).` : "";
       setPaste("");
-      return { batchId: batch.id, message: `${parsed.items.length} items imported${errs}` };
+      return { batchId: batch.id, message: `${parsed.items.length} items imported${errs}.${cut}` };
     });
   }
 

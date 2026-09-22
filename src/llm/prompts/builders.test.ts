@@ -11,7 +11,8 @@ describe("prompt builders", () => {
     expect(r.prompt).toContain(PASTE_HEADER);
     expect(r.prompt).toContain("subtitles");
     expect(r.prompt).toContain("Also skip the roughly 200 most common");
-    expect(r.prompt).toContain("Aim for about 30 items");
+    expect(r.prompt).toContain("Hard limit: 30 items");
+    expect(r.prompt).toContain('"limit": 30');
     expect(r.prompt).toContain("Favour phrases");
     expect(r.prompt).toContain('"tag": "La casa de papel S1E3"');
     expect(r.prompt).toContain("Known lemmas");
