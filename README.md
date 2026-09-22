@@ -30,13 +30,23 @@ node scripts/build-frequency.ts    # OpenSubtitles frequency list -> public/data
 node scripts/make-icons.mjs        # PWA icons
 ```
 
-## Deploy (Cloudflare Pages, free)
+## Native app "¡A la luna!" (phase 2, TestFlight)
 
-One-time: `pnpm exec wrangler login` (opens a browser), then `pnpm exec wrangler pages project create vocab-app`.
+The same code runs in a Capacitor 8 wrapper. `ios/` is generated and committed; builds, signing and TestFlight
+uploads happen on GitHub Actions (`.github/workflows/ios.yml`, `fastlane/`), never on Windows. Plan, milestones and
+the deferred-items tracker: `PLAN-NATIVE.md`. Native code layout and hand edits: `ios/README.md`.
 
-Every release: `pnpm run deploy` (bare `pnpm deploy` is a different pnpm built-in). The URL is `https://vocab-app.pages.dev` (or the custom domain you attach).
-On the phone: open the URL in Safari → Share → Add to Home Screen. Open it from the icon, not from Safari,
-so it runs installed (offline shell, its own storage).
+- After changing plugins or the web build: `pnpm vite build && pnpm exec cap sync ios` locally to check that
+  `ios/App/CapApp-SPM/Package.swift` still resolves; CI runs the same steps.
+- Trigger a build: push to `main` (paths under `src/`, `ios/`, …) or Actions → iOS → Run workflow. Tick
+  `force_match` after changing capabilities on the App ID.
+- Install: TestFlight app on the phone, internal testing group.
+
+## Web app (phase 1, frozen)
+
+Deploy on demand only: Actions → CI → Run workflow with `deploy_web`, or locally `pnpm run deploy` (bare `pnpm deploy`
+is a different pnpm built-in). The URL is `https://vocab-app.pages.dev`. Migration to the native app: Settings →
+Export backup in the web app, Settings → Import backup (Replace) in the native app.
 
 ## First run on the phone
 

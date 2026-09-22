@@ -24,7 +24,7 @@ export class WebSpeechPlayer implements AudioPlayer {
     this.cached = window.speechSynthesis?.getVoices() ?? [];
   }
 
-  voices(): VoiceInfo[] {
+  async voices(): Promise<VoiceInfo[]> {
     this.refreshVoices();
     return this.cached.map((v) => ({ id: v.voiceURI, name: v.name, lang: v.lang, local: v.localService }));
   }

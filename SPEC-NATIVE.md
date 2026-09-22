@@ -100,7 +100,7 @@ Wrapper. The only feature where native is materially better is voice review leve
 - The bundle id cannot be changed after the first upload without creating a new app. It seeds the iCloud container (`iCloud.in.fabricius.vocab`) and App Group (`group.in.fabricius.vocab`) names.
 - Signing: `fastlane match` on the runner with an App Store Connect API key creates and stores certificates and profiles in a private repo; nothing is done on a personal machine.
 - Pipeline on push to `main`: `pnpm build` → `cap sync ios` → `xcodebuild archive` → upload to TestFlight (internal tester: you). Free tier ≈ 200 macOS minutes/month, one build ≈ 15 minutes.
-- iOS project: generated once with Capacitor 7 and SPM (no CocoaPods), committed. Extension targets (widgets) are added from CI with a scripted project edit; if that proves too brittle it is deferred to the tracker.
+- iOS project: generated once with Capacitor and SPM (no CocoaPods), committed. Capacitor 8 rather than 7, since 8 is the current major and defaults to SPM (`PLAN-NATIVE.md` §9.2 D1). Extension targets (widgets) are added from CI with a scripted project edit; if that proves too brittle it is deferred to the tracker.
 - Data migration from the web app: Export backup → Import backup (exists). One-time, manual.
 
 ## 4. Card creation

@@ -1,0 +1,2 @@
+app_identifier("in.fabricius.vocab")
+team_id(ENV["APPLE_TEAM_ID"])

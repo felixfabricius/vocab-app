@@ -1,0 +1,6 @@
+# Certificates and profiles live encrypted in a private repo; MATCH_PASSWORD decrypts them and
+# MATCH_GIT_BASIC_AUTHORIZATION (base64 of "user:token") authenticates the clone.
+git_url("https://github.com/felixfabricius/ios-certificates.git")
+storage_mode("git")
+type("appstore")
+app_identifier(["in.fabricius.vocab"])

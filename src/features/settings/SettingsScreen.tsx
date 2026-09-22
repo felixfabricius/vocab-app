@@ -7,6 +7,7 @@ import type { PlaybackMode } from "@/core/types";
 import { exportBackup, importBackup, parseBackup, saveBackupFile } from "@/storage/backup";
 import type { VoiceInfo } from "@/audio/AudioPlayer";
 import { MODEL_CHOICES } from "@/llm/pricing";
+import { isNative } from "@/native/platform";
 
 export function SettingsScreen() {
   const nav = useNavigate();
@@ -17,10 +18,17 @@ export function SettingsScreen() {
   const audio = getAudio();
 
   useEffect(() => {
-    const load = () => setVoices(audio.voices().filter((v) => v.lang.toLowerCase().startsWith("es")));
+    let alive = true;
+    const load = () => {
+      void audio.voices().then((all) => alive && setVoices(all.filter((v) => v.lang.toLowerCase().startsWith("es"))));
+    };
     load();
+    if (isNative()) return () => void (alive = false);
     window.speechSynthesis?.addEventListener("voiceschanged", load);
-    return () => window.speechSynthesis?.removeEventListener("voiceschanged", load);
+    return () => {
+      alive = false;
+      window.speechSynthesis?.removeEventListener("voiceschanged", load);
+    };
   }, [audio]);
 
   useEffect(() => {

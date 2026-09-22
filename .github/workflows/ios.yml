@@ -1,0 +1,79 @@
+name: iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_match:
+        description: Regenerate provisioning profiles (after changing capabilities)
+        type: boolean
+        default: false
+      xcode:
+        description: Xcode version on the runner
+        type: string
+        default: "26.6"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "ios/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "capacitor.config.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "fastlane/**"
+      - "Gemfile*"
+      - ".github/workflows/ios.yml"
+
+concurrency:
+  group: ios
+  cancel-in-progress: true
+
+jobs:
+  testflight:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm vite build
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_${{ inputs.xcode || '26.6' }}.app"
+
+      # M6+: brew install xcodegen && (cd ios/App && xcodegen generate)
+      - run: pnpm exec cap sync ios
+      # M3–M5: ruby scripts/ios/sync-project.rb
+
+      - name: Install fastlane
+        run: bundle install
+
+      - name: Build and upload to TestFlight
+        run: bundle exec fastlane ios beta
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          FORCE_MATCH: ${{ inputs.force_match }}
+          FASTLANE_SKIP_UPDATE_CHECK: "1"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-logs-${{ github.run_number }}
+          path: |
+            fastlane/logs
+            build/*.ipa
+          if-no-files-found: ignore

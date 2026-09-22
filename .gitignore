@@ -29,5 +29,12 @@ Thumbs.db
 # test / coverage
 coverage/
 
+# iOS build output (CI)
+build/
+SourcePackages/
+fastlane/logs/
+fastlane/report.xml
+fastlane/README.md
+
 # downloaded reference data (rebuilt by scripts/)
 .cache/

@@ -9,12 +9,15 @@ import { getRepository } from "@/storage/DexieRepository";
 import type { Repository } from "@/storage/Repository";
 import type { AudioPlayer } from "@/audio/AudioPlayer";
 import { WebSpeechPlayer } from "@/audio/WebSpeechPlayer";
+import { NativeTtsPlayer } from "@/audio/NativeTtsPlayer";
+import { isNative } from "@/native/platform";
 
 export const repo: Repository = getRepository();
 
 let player: AudioPlayer | undefined;
+/** EXT: audio — native builds speak through AVSpeechSynthesizer, the web app through Web Speech. */
 export function getAudio(): AudioPlayer {
-  if (!player) player = new WebSpeechPlayer();
+  if (!player) player = isNative() ? new NativeTtsPlayer() : new WebSpeechPlayer();
   return player;
 }
 

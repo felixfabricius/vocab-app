@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      deploy_web:
+        description: Deploy the frozen web app to Cloudflare Pages (normally not needed; TestFlight is the install path)
+        type: boolean
+        default: false
 
 jobs:
   test-build:
@@ -25,10 +31,10 @@ jobs:
           path: dist
 
   deploy:
-    # Deploys to Cloudflare Pages when the two secrets exist (Settings → Secrets → Actions):
-    # CLOUDFLARE_API_TOKEN (Pages: Edit) and CLOUDFLARE_ACCOUNT_ID.
+    # The web app is frozen since the native phase (PLAN-NATIVE D9): deploys only on manual request,
+    # and only when the two secrets exist: CLOUDFLARE_API_TOKEN (Pages: Edit) and CLOUDFLARE_ACCOUNT_ID.
     needs: test-build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_web
     runs-on: ubuntu-latest
     environment: production
     steps:

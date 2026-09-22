@@ -22,7 +22,8 @@ export interface AudioPlayer {
   /** Play a cached clip by key; resolves false if the clip is missing. */
   play(clipKey: string): Promise<boolean>;
   cancel(): void;
-  voices(): VoiceInfo[];
+  /** Available voices; asynchronous because the native list is fetched over the bridge. */
+  voices(): Promise<VoiceInfo[]>;
   setVoice(id: string | undefined): void;
   /** Some platforms need a user gesture before audio works; call from a tap handler. */
   unlock(): void;

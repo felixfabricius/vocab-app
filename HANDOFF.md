@@ -2,11 +2,11 @@
 
 Everything an implementer needs to continue from the 2026-09-21 state without the chat history.
 Product decisions: `SPEC.md` (web phase, still valid) and `SPEC-NATIVE.md` (phase 2, revision 3, all questions answered; §1 is the decision table).
-`PLAN-NATIVE.md` (implementation plan plus the deferred-items tracker) is referenced by the spec but **not written yet**; it is the first task of the next session.
+`PLAN-NATIVE.md` (revision 1, 2026-09-21) is the implementation plan: milestones M1–M7 with per-file steps, the CI pipeline, and the deferred-items tracker and decisions log in its §9. Start there; the next task is M1.
 
 ## 0. Phase-2 decisions that shape implementation
 
-- **Platform: Capacitor wrapper** around the existing web app (Capacitor 7, SPM, no CocoaPods). OS features become small Swift plugins behind the seams in `ARCHITECTURE.md`. No SwiftUI rewrite.
+- **Platform: Capacitor wrapper** around the existing web app (Capacitor 8, SPM by default, no CocoaPods; the spec's "Capacitor 7" is superseded by `PLAN-NATIVE.md` §9.2 D1). OS features become small Swift plugins behind the seams in `ARCHITECTURE.md`. No SwiftUI rewrite.
 - **App name "¡A la luna!"**, bundle id **`in.fabricius.vocab`**, iCloud container `iCloud.in.fabricius.vocab`, App Group `group.in.fabricius.vocab`. Xcode product name stays ASCII (`ALaLuna`); the display name carries the punctuation. The bundle id is permanent after the first upload.
 - **Minimum iOS 26.** iPhone 14 is the only target device.
 - **CI-led, no Mac.** Builds, signing (`fastlane match` with an App Store Connect API key) and TestFlight uploads run on GitHub Actions macOS runners. Everything is attempted from Windows + CI first. Whatever proves too cumbersome (candidates: adding the widget extension target, debugging entitlements or the audio session) is deferred, the decision documented, and listed in the tracker in `PLAN-NATIVE.md` for a later rented-Mac session.
