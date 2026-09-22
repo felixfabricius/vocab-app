@@ -19,7 +19,8 @@ Windows. To change build settings, edit `project.yml`.
   Files app. If the build fails with "profile doesn't support the iCloud capability", run the workflow once with
   `force_match` so match regenerates the profile from the App ID's capabilities.
 - `App/Base.lproj/Main.storyboard`: the view controller is `ViewController` (module `ALaLuna`), which registers the in-app
-  plugins in `App/Plugins/` (`SpeechPlugin`, `TranslatePlugin`, `CloudFilesPlugin`) from `capacitorDidLoad()`.
+  plugins in `App/Plugins/` (`SpeechPlugin`, `TranslatePlugin`, `CloudFilesPlugin`, `AudioSessionPlugin`) from
+  `capacitorDidLoad()`. `UIBackgroundModes: audio` keeps the remote command centre reachable while locked (M7).
 
 New Swift files under `App/` or `../Widgets/` are picked up by xcodegen automatically.
 

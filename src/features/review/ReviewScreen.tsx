@@ -6,7 +6,12 @@ import { newId } from "@/core/ids";
 import { buildSession, buildTagSession } from "@/core/scheduler/session";
 import { dayEnd } from "@/core/scheduler/day";
 import * as rs from "@/core/review/session";
-import type { Entry, GradeName, Settings } from "@/core/types";
+import type { Entry, GradeName, ReviewMode, Settings } from "@/core/types";
+import type { InputHandlers } from "@/input/InputSource";
+import { RemoteButtonsInput } from "@/input/RemoteButtonsInput";
+import { VoiceInput } from "@/input/VoiceInput";
+import { isNative } from "@/native/platform";
+import { NativeLiveTranscriber } from "@/speech/LiveTranscriber";
 import { conjugate, loadVerbTable, type TenseId } from "@/core/verbs";
 import { tenseLabel } from "@/features/grammar/tenseService";
 import { CardBack, CardFront, spokenBack, type CardContent } from "./CardView";
@@ -27,6 +32,7 @@ export function ReviewScreen() {
   const [content, setContent] = useState<CardContent | undefined>();
   const [showHint, setShowHint] = useState(false);
   const contentCache = useRef(new Map<string, CardContent>());
+  const voiceRef = useRef<VoiceInput | undefined>(undefined);
   const audio = getAudio();
 
   const env = useMemo<rs.ReviewEnv | undefined>(() => {
@@ -134,19 +140,25 @@ export function ReviewScreen() {
     [audio, settings],
   );
 
-  const doFlip = useCallback(() => {
-    if (!state || !state.current || state.flipped) return;
-    audio.unlock();
-    const next = rs.flip(state);
-    setState(next);
-    if (content) void speakBack(content);
-  }, [state, content, audio, speakBack]);
+  const voiceMode = isNative() && settings?.playback === "handsFree";
+
+  const doFlip = useCallback(
+    (speak = true) => {
+      if (!state || !state.current || state.flipped) return;
+      audio.unlock();
+      const next = rs.flip(state);
+      setState(next);
+      if (content && speak) void speakBack(content);
+    },
+    [state, content, audio, speakBack],
+  );
 
   const doGrade = useCallback(
-    (g: GradeName) => {
+    (g: GradeName, mode?: ReviewMode) => {
       if (!state || !env || !state.flipped) return;
       audio.cancel();
-      const r = rs.grade(state, g, env);
+      if (mode !== "voice") voiceRef.current?.cancel();
+      const r = rs.grade(state, g, mode ? { ...env, mode } : env);
       setState(r.state);
       void applyEffects(r.effects).then(() => {
         if (r.state.finished) void getCloudSync().drainOutbox().catch(() => undefined);
@@ -192,7 +204,50 @@ export function ReviewScreen() {
     [doGrade],
   );
 
-  const swipe = useSwipe({ enabled: !!state?.flipped, onSwipe, onTap: doFlip });
+  const swipe = useSwipe({ enabled: !!state?.flipped, onSwipe, onTap: () => doFlip() });
+
+  // EXT: input — headphone buttons and the voice loop call these through a ref, so a
+  // long-running loop always reaches the latest callbacks.
+  const latest = useRef({ doFlip, doGrade, doBury, speakBack, content, flipped: !!state?.flipped });
+  latest.current = { doFlip, doGrade, doBury, speakBack, content, flipped: !!state?.flipped };
+  const handlers = useMemo<InputHandlers>(
+    () => ({
+      flip: () => latest.current.doFlip(false),
+      grade: (g, mode) => latest.current.doGrade(g, mode),
+      repeatAudio: () => {
+        if (latest.current.content) void latest.current.speakBack(latest.current.content);
+      },
+      skip: () => latest.current.doBury(),
+      isFlipped: () => latest.current.flipped,
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    if (!isNative() || phase !== "reviewing") return;
+    const remote = new RemoteButtonsInput();
+    remote.attach(handlers);
+    return () => remote.detach();
+  }, [handlers, phase]);
+
+  // Voice review: one loop per card, cancelled when the card changes or the screen closes.
+  const currentId = current?.id;
+  useEffect(() => {
+    if (!voiceMode || !settings || !content || !currentId || state?.flipped) return;
+    const voice = (voiceRef.current ??= new VoiceInput(audio, new NativeLiveTranscriber(), () => settings.speechRate));
+    const front = content.paradigm
+      ? { front: `${content.entry.lemma}, ${content.paradigm.tenseLabel}`, frontLang: undefined }
+      : { front: content.sense?.gloss ?? content.allSenses.map((s) => s.gloss).join(", "), frontLang: "en-US" };
+    void voice.startCard(
+      { front: front.front, ...(front.frontLang ? { frontLang: front.frontLang } : {}), back: spokenBack(content, settings.showVosotros) },
+      handlers,
+      { pauseSeconds: settings.voicePauseSeconds, listenSeconds: settings.voiceListenSeconds },
+    );
+    return () => voice.cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceMode, currentId, content, handlers]);
+
+  useEffect(() => () => void voiceRef.current?.dispose(), []);
 
   if (phase === "loading" || !state || !settings) return <Spinner label="Building session…" />;
 
@@ -260,7 +315,7 @@ export function ReviewScreen() {
             </Button>
           </>
         ) : (
-          <Button variant="primary" className="flex-1" onClick={doFlip}>
+          <Button variant="primary" className="flex-1" onClick={() => doFlip()}>
             Show answer
           </Button>
         )}

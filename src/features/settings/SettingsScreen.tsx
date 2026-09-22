@@ -222,8 +222,20 @@ export function SettingsScreen() {
           >
             <option value="display">Display only</option>
             <option value="audioOn">Audio on flip</option>
+            {isNative() && <option value="handsFree">Voice review (sí / no)</option>}
           </select>
         </Row>
+        {isNative() && settings.playback === "handsFree" && (
+          <>
+            <Row label="Pause before the answer (s)">
+              <input type="number" inputMode="numeric" className="w-20 rounded-lg bg-surface-2 px-2 py-1 text-right" value={settings.voicePauseSeconds} onChange={(e) => void update({ voicePauseSeconds: num(e.target.value, settings.voicePauseSeconds) })} />
+            </Row>
+            <Row label="Listen for (s)">
+              <input type="number" inputMode="numeric" className="w-20 rounded-lg bg-surface-2 px-2 py-1 text-right" value={settings.voiceListenSeconds} onChange={(e) => void update({ voiceListenSeconds: num(e.target.value, settings.voiceListenSeconds) })} />
+            </Row>
+            <p className="text-xs text-muted">Front spoken → pause → back spoken → say sí, no or otra vez. Silence repeats once, then skips the card for today. EarPods: 1 click Good, 2 Again, 3 repeat.</p>
+          </>
+        )}
         <Row label="Voice">
           <select
             className="max-w-[12rem] rounded-lg bg-surface-2 px-2 py-1"

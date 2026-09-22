@@ -272,6 +272,9 @@ export interface Settings {
   translateProvider: "apple" | "claude";
   /** iCloud snapshot + change-log state (native only) */
   cloud?: CloudState;
+  /** voice review: seconds between the spoken front and the flip, and how long to listen */
+  voicePauseSeconds: number;
+  voiceListenSeconds: number;
   updatedAt: string;
 }
 
@@ -322,5 +325,7 @@ export const DEFAULT_SETTINGS: Settings = {
   speechRate: 0.95,
   dailySpendCapUsd: 1,
   translateProvider: "apple",
+  voicePauseSeconds: 3,
+  voiceListenSeconds: 4,
   updatedAt: new Date(0).toISOString(),
 };

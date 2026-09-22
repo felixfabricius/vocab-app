@@ -8,5 +8,6 @@ class ViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(SpeechPlugin())
         bridge?.registerPluginInstance(TranslatePlugin())
         bridge?.registerPluginInstance(CloudFilesPlugin())
+        bridge?.registerPluginInstance(AudioSessionPlugin())
     }
 }
