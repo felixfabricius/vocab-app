@@ -8,10 +8,11 @@ import type { AudioPlayer } from "@/audio/AudioPlayer";
 import { configureAudioSession, deactivateAudioSession } from "@/native/audioSession";
 import type { LiveTranscriber } from "@/speech/LiveTranscriber";
 import type { InputHandlers } from "./InputSource";
-import { CONTEXTUAL_STRINGS, runVoiceCard, type VoiceCard, type VoiceDeps, type VoiceSettings } from "@/features/review/voiceLoop";
+import { CONTEXTUAL_STRINGS, runVoiceCard, type VoiceCard, type VoiceDeps, type VoiceSettings, type VoiceStatus } from "@/features/review/voiceLoop";
 
 export class VoiceInput {
   private controller: AbortController | undefined;
+  private status: ((st: VoiceStatus) => void) | undefined;
 
   constructor(
     private readonly audio: AudioPlayer,
@@ -27,22 +28,30 @@ export class VoiceInput {
         new Promise<string>((resolve) => {
           this.transcriber
             .start("es", { contextualStrings: CONTEXTUAL_STRINGS, maxSeconds: seconds, silenceSeconds: 1.2, taskHint: "confirmation" }, () => undefined, (text) => resolve(text))
-            .catch(() => resolve(""));
+            .catch((e: Error) => {
+              // Not a silence: surface it, and never fake-listen (that would loop through repeats instantly).
+              this.status?.({ phase: "error", message: e.message });
+              this.controller?.abort();
+              resolve("");
+            });
         }),
       wait: (ms) => new Promise((r) => setTimeout(r, ms)),
     };
   }
 
-  async startCard(card: VoiceCard, handlers: InputHandlers, settings: VoiceSettings): Promise<void> {
+  async startCard(card: VoiceCard, handlers: InputHandlers, settings: VoiceSettings, onStatus?: (st: VoiceStatus) => void): Promise<void> {
     this.cancel();
     const controller = new AbortController();
     this.controller = controller;
+    this.status = onStatus;
     try {
       await configureAudioSession("playAndRecord");
     } catch {
       // the recogniser configures the session itself when it starts
     }
-    await runVoiceCard(this.deps(), handlers, card, settings, controller.signal);
+    await runVoiceCard(this.deps(), handlers, card, settings, controller.signal, (st) => {
+      if (this.controller === controller) onStatus?.(st);
+    });
     if (this.controller === controller) this.controller = undefined;
   }
 

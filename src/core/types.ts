@@ -162,6 +162,7 @@ export interface Lookup {
   dir: "en-es" | "es-en";
   src: string;
   dst: string;
+  /** "shortcuts" only on rows imported from the phase-1 Shortcuts log */
   provider: "apple" | "claude" | "shortcuts";
   /** Claude's suggested flashcard entry, when the lookup went through Claude */
   draft?: EntryDraft;
@@ -266,8 +267,6 @@ export interface Settings {
   llmUsage?: LlmUsage;
   /** Warn above this many USD per day; hard stop at twice this */
   dailySpendCapUsd: number;
-  /** Newest translate-log timestamp already imported; older lines are skipped */
-  translateLogImportedUntil?: string;
   /** Default translator on the translate screen; "apple" only exists in the native app */
   translateProvider: "apple" | "claude";
   /** iCloud snapshot + change-log state (native only) */

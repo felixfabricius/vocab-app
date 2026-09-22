@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCardsFromLookups, draftFromLookup, newLookup } from "./lookupsService";
+import { createCardsFromLookups, draftFromLookup, draftFromLookupRow, newLookup } from "./lookupsService";
 import { mergeDraft } from "@/features/entries/enrichService";
 import { DexieRepository } from "@/storage/DexieRepository";
 import { VocabDB } from "@/storage/db";
@@ -12,6 +12,13 @@ function fresh() {
 }
 
 describe("lookups → drafts", () => {
+  it("strips trailing punctuation and makes sentences phrase drafts", () => {
+    const d = draftFromLookupRow({ dir: "en-es", src: "where is the bathroom?", dst: "¿Dónde está el baño?" });
+    expect(d?.lemma).toBe("¿Dónde está el baño");
+    expect(d?.pos).toBe("phrase");
+    expect(draftFromLookupRow({ dir: "es-en", src: "", dst: "x" })).toBeUndefined();
+  });
+
   it("builds minimal drafts from either direction and prefers a stored Claude draft", () => {
     const a = draftFromLookup(newLookup({ dir: "en-es", src: "right away", dst: "al tiro", provider: "apple" }));
     expect(a?.lemma).toBe("al tiro");

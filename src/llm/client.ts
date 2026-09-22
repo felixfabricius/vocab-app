@@ -89,6 +89,8 @@ export async function callClaude<T>(env: LlmEnv, call: LlmCall<T>): Promise<LlmR
       : ({ type: "image", source: { type: "base64", media_type: p.mediaType, data: p.base64 } } as const),
   );
 
+  // Server-side fallback exists for the Opus models only; Sonnet rejects the parameter.
+  const opus = model.startsWith("claude-opus");
   const response = await client.beta.messages.parse({
     model,
     max_tokens: call.maxTokens ?? 16000,
@@ -96,8 +98,7 @@ export async function callClaude<T>(env: LlmEnv, call: LlmCall<T>): Promise<LlmR
     system: [{ type: "text", text: call.system, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content }],
     output_config: { effort: call.effort ?? "low", format: betaZodOutputFormat(call.schema) },
-    betas: ["server-side-fallback-2026-06-01"],
-    fallbacks: [{ model: "claude-opus-4-8" }],
+    ...(opus ? { betas: ["server-side-fallback-2026-06-01"], fallbacks: [{ model: "claude-opus-4-8" }] } : {}),
   });
 
   if (response.stop_reason === "refusal") {

@@ -63,35 +63,62 @@ async function speakBack(deps: VoiceDeps, card: VoiceCard, signal: AbortSignal) 
   }
 }
 
+/** What the loop is doing, for a status line on the review screen. */
+export type VoiceStatus =
+  | { phase: "front" }
+  | { phase: "pause" }
+  | { phase: "back" }
+  | { phase: "listening" }
+  | { phase: "heard"; text: string; answer: Answer }
+  | { phase: "silence"; attempt: number }
+  | { phase: "skipped" }
+  | { phase: "error"; message: string };
+
 /** Runs one card. Resolves with what happened; the handlers have already been called. */
-export async function runVoiceCard(deps: VoiceDeps, h: InputHandlers, card: VoiceCard, s: VoiceSettings, signal: AbortSignal): Promise<"graded" | "skipped" | "cancelled"> {
+export async function runVoiceCard(
+  deps: VoiceDeps,
+  h: InputHandlers,
+  card: VoiceCard,
+  s: VoiceSettings,
+  signal: AbortSignal,
+  onStatus: (st: VoiceStatus) => void = () => undefined,
+): Promise<"graded" | "skipped" | "cancelled"> {
   if (signal.aborted) return "cancelled";
+  onStatus({ phase: "front" });
   await deps.speak(card.front, card.frontLang ?? "en-US"); // LANG: the learner's language
   if (signal.aborted) return "cancelled";
+  onStatus({ phase: "pause" });
   await deps.wait(s.pauseSeconds * 1000);
   if (signal.aborted) return "cancelled";
   if (!h.isFlipped()) h.flip();
+  onStatus({ phase: "back" });
   await speakBack(deps, card, signal);
 
   let silences = 0;
   for (;;) {
     if (signal.aborted) return "cancelled";
+    onStatus({ phase: "listening" });
     const heard = await deps.listen(s.listenSeconds);
     if (signal.aborted) return "cancelled";
     const answer = interpretAnswer(heard);
+    if (heard.trim()) onStatus({ phase: "heard", text: heard, answer });
     if (answer === "good" || answer === "again") {
+      await deps.wait(300);
       h.grade(answer, "voice");
       return "graded";
     }
     if (answer === "repeat") {
+      onStatus({ phase: "back" });
       await speakBack(deps, card, signal);
       continue;
     }
     silences++;
     if (silences >= 2) {
+      onStatus({ phase: "skipped" });
       h.skip();
       return "skipped";
     }
+    onStatus({ phase: "silence", attempt: silences });
     await speakBack(deps, card, signal);
   }
 }

@@ -30,7 +30,7 @@ Hands-free review (screen locked) is deliberately absent from phase 1. When it a
 ```
 photo / text / word ──► llm/pipelines ──► EntryDraft[] ──┐
 paste (Claude app)  ──► core/import/paste ──────────────┤
-translate log       ──► core/import/translateLog ───────┼──► importService.createBatch ──► suggestions (inbox)
+translate lookups   ──► features/translate/lookupsService ┼──► importService.createBatch ──► suggestions (drafts table)
 seed                ──► app/seed ───────────────────────┘                                        │
                                                                                                   ▼
                                               importService.acceptBatch ──► entries, senses, sentences, encounters, cards

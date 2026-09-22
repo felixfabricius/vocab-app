@@ -53,8 +53,8 @@ Export backup in the web app, Settings → Import backup (Replace) in the native
 1. Settings → Claude API: paste your Anthropic key. Optional: OpenAI key for the microphone in Translate.
 2. Settings → Audio → Voice: pick Francisca (es-CL) if listed; download it under iOS Settings → Accessibility → Spoken Content → Voices → Spanish.
 3. Settings → Device checks → confirm voices, camera and storage persistence.
-4. Build the four Shortcuts in `shortcuts/README.md` for lock-screen translate.
-5. Export a backup from Settings once a week until sync exists.
+4. Lock screen → Customise → add the "Translate" widgets and put a Translate control in a bottom corner.
+5. Settings → iCloud Drive: check the folder "A la luna" appears in Files after the first background.
 
 ## Costs
 

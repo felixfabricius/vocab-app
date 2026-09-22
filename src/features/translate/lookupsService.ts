@@ -5,7 +5,6 @@
  * exists (SPEC-NATIVE §4a).
  */
 import { newId, nowIso } from "@/core/ids";
-import { draftFromLookupRow } from "@/core/import/translateLog";
 import { loadFrequency } from "@/core/priority/frequency";
 import type { EntryDraft, Lookup } from "@/core/types";
 import type { LlmEnv } from "@/llm/client";
@@ -23,6 +22,27 @@ export function newLookup(o: { dir: Lookup["dir"]; src: string; dst: string; pro
     dst: o.dst.trim(),
     provider: o.provider,
     ...(o.draft ? { draft: o.draft } : {}),
+  };
+}
+
+/**
+ * Minimal draft for one lookup: the Spanish side becomes the lemma, the English
+ * side the gloss. Whole sentences become phrase drafts too (SPEC-NATIVE §4a: every
+ * lookup becomes a draft; unwanted rows are swiped away in the table).
+ */
+export function draftFromLookupRow(r: { dir: "en-es" | "es-en"; src: string; dst: string }): EntryDraft | undefined {
+  const es = (r.dir === "en-es" ? r.dst : r.src).replace(/[.!?¡¿]+$/g, "").trim();
+  const en = (r.dir === "en-es" ? r.src : r.dst).replace(/[.!?]+$/g, "").trim();
+  if (!es || !en) return undefined;
+  const words = es.split(/\s+/).length;
+  return {
+    lemma: es,
+    pos: words > 1 ? "phrase" : "other",
+    isPhrase: words > 1,
+    senses: [{ gloss: en }],
+    priority: "standard",
+    regional: "neutral",
+    fromSentence: [],
   };
 }
 

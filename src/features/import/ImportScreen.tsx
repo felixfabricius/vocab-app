@@ -5,10 +5,9 @@ import { repo } from "@/app/services";
 import { draftContext, llmEnv } from "@/app/llmEnv";
 import { useSettings } from "@/app/useSettings";
 import { parsePasteImport, parseTsvLines } from "@/core/import/paste";
-import { latestTimestamp, parseTranslateLog, rowsAfter } from "@/core/import/translateLog";
 import type { ImportBatch } from "@/core/types";
 import { enrichEntryIds } from "@/features/entries/enrichService";
-import { createCardsFromLookups, newLookup } from "@/features/translate/lookupsService";
+import { createCardsFromLookups } from "@/features/translate/lookupsService";
 import { runJob, useJob } from "@/app/jobs";
 import { JobBar } from "./DraftsTable";
 import { ManualAddCard } from "./ManualAddCard";
@@ -36,7 +35,6 @@ export function ImportScreen() {
   const [lookupCount, setLookupCount] = useState(0);
   const cameraInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const logInput = useRef<HTMLInputElement>(null);
 
   const hasKey = !!settings?.anthropicKey;
   const job = useJob();
@@ -180,22 +178,6 @@ export function ImportScreen() {
     });
   }
 
-  /** The Shortcuts file (until M6): new lines become lookups, then the same job as the button above. */
-  async function onTranslateLog(file: File) {
-    await run("Translate log import", async () => {
-      const parsed = parseTranslateLog(await file.text());
-      const s = await repo.getSettings();
-      const fresh = rowsAfter(parsed.rows, s.translateLogImportedUntil);
-      const errors = parsed.errors.length ? ` Skipped lines: ${parsed.errors.join("; ")}` : "";
-      const newest = latestTimestamp(fresh);
-      if (newest) await repo.saveSettings({ translateLogImportedUntil: newest });
-      if (fresh.length === 0) return { message: `No new lookups since the last import.${errors}` };
-      await repo.putLookups(fresh.map((r) => newLookup({ dir: r.dir, src: r.src, dst: r.dst, provider: "shortcuts", at: Number.isNaN(Date.parse(r.at)) ? undefined : new Date(r.at).toISOString() })));
-      onCreateFromLookups();
-      return { message: `${fresh.length} new lookups from the file.${errors}` };
-    });
-  }
-
   function onManualAi(input: string, manualTag: string) {
     void run("Add word", async () => {
       const ctx = await draftContext();
@@ -333,18 +315,6 @@ export function ImportScreen() {
       </Card>
 
       <ManualAddCard hasKey={hasKey} busy={!!busy} tag={tag.trim()} onAi={onManualAi} onSave={onManualSave} />
-
-      <Card className="mb-4">
-        <h2 className="mb-2 font-medium">Translate log (Shortcuts)</h2>
-        <p className="mb-3 text-sm text-muted">
-          The file the lock-screen Shortcuts write: iCloud Drive › Kurzbefehle › vocab-import › translate-log.txt. New lines become lookups and go
-          straight into a drafts table.
-        </p>
-        <Button className="w-full" disabled={!!busy} onClick={() => logInput.current?.click()}>
-          Choose translate-log.txt
-        </Button>
-        <input ref={logInput} type="file" accept=".jsonl,.txt,.json,text/plain,application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onTranslateLog(f); e.target.value = ""; }} />
-      </Card>
 
     </Screen>
   );

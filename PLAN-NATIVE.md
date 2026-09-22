@@ -608,7 +608,7 @@ Items that proved too cumbersome from Windows + CI, plus ideas parked for later.
 | T6 | Home-screen widget showing due counts (needs App Group data written by the app) | idea | open | Not requested in the spec | App Group entitlement + `UserDefaults(suiteName:)` written from `CloudFiles`-style plugin |
 | T7 | Multi-device sync over the change log | idea | open | Out of scope per spec §7 | Conflict rules beyond newer-`updatedAt`-wins |
 | T8 | Keyboard shown automatically on deep link | M6 | deferred | 2026-09-22: the field is focused and scrolled into view; the private-API swizzle was not attempted blind | One tap shows the keyboard; try the swizzle in a rented-Mac session if it matters |
-| T9 | Remove the Shortcuts import path and `shortcuts/README.md` | M6 | open | Waits for the widgets and controls to be confirmed on the phone | Delete the translate-log card, `translateLogImportedUntil`, `core/import/translateLog.ts` (keep `draftFromLookupRow`) |
+| T9 | Remove the Shortcuts import path and `shortcuts/README.md` | M6 | done | 2026-09-22: widgets and controls confirmed on the phone; card, setting, parser and guide removed | — |
 
 ### 9.2 Decisions log
 
@@ -629,6 +629,8 @@ Items that proved too cumbersome from Windows + CI, plus ideas parked for later.
 | D13 | 2026-09-22 | App ID iCloud mode "Include CloudKit support (requires Xcode 6)" | The "Compatible with Xcode 5" mode yields profiles with only the old wildcard ubiquity entitlement; the modern `icloud-container-identifiers` / `icloud-services` entitlements the app declares need the Xcode 6 mode. CloudKit itself is not used. |
 | D14 | 2026-09-22 | Translation framework languages are resolved to regional identifiers in the plugin | `LanguageAvailability` lists `es-ES` and `en-US`; bare `es`/`en` failed on the phone. |
 | D15 | 2026-09-22 | xcodegen from M6 replaces the Ruby source-adding script | One declarative spec covers the app target and the widget extension. |
+| D16 | 2026-09-22 | In-app plugins are registered by instantiating `ViewController` in `SceneDelegate.swift` | Capacitor 8's scene delegate creates the bridge view controller in code, so the storyboard's custom class was never used; every native plugin reported "not implemented" until this. |
+| D17 | 2026-09-22 | `fallbacks` and its beta are sent only for Opus models | Sonnet 5 rejects the parameter with a 400. |
 
 ### 9.3 Questions that came up while planning (defaults chosen, change here if wrong)
 

@@ -12,12 +12,35 @@ import { RemoteButtonsInput } from "@/input/RemoteButtonsInput";
 import { VoiceInput } from "@/input/VoiceInput";
 import { isNative } from "@/native/platform";
 import { NativeLiveTranscriber } from "@/speech/LiveTranscriber";
+import type { VoiceStatus } from "./voiceLoop";
 import { conjugate, loadVerbTable, type TenseId } from "@/core/verbs";
 import { tenseLabel } from "@/features/grammar/tenseService";
 import { CardBack, CardFront, spokenBack, type CardContent } from "./CardView";
 import { useSwipe, type SwipeDir } from "./useSwipe";
 
 type Phase = "loading" | "reviewing" | "done";
+
+function voiceStatusText(s: VoiceStatus | undefined): string {
+  if (!s) return "Voice review: starting…";
+  switch (s.phase) {
+    case "front":
+      return "Speaking the prompt…";
+    case "pause":
+      return "Your turn: say the answer";
+    case "back":
+      return "Speaking the answer…";
+    case "listening":
+      return "Listening: sí / no / otra vez";
+    case "heard":
+      return `Heard “${s.text}” → ${s.answer === "good" ? "Good ✓" : s.answer === "again" ? "Again ✗" : s.answer === "repeat" ? "repeat" : "not understood"}`;
+    case "silence":
+      return "Nothing heard, repeating once…";
+    case "skipped":
+      return "No answer, card skipped for today";
+    case "error":
+      return `Microphone: ${s.message}`;
+  }
+}
 
 export function ReviewScreen() {
   const nav = useNavigate();
@@ -33,6 +56,7 @@ export function ReviewScreen() {
   const [showHint, setShowHint] = useState(false);
   const contentCache = useRef(new Map<string, CardContent>());
   const voiceRef = useRef<VoiceInput | undefined>(undefined);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | undefined>();
   const audio = getAudio();
 
   const env = useMemo<rs.ReviewEnv | undefined>(() => {
@@ -238,16 +262,26 @@ export function ReviewScreen() {
     const front = content.paradigm
       ? { front: `${content.entry.lemma}, ${content.paradigm.tenseLabel}`, frontLang: undefined }
       : { front: content.sense?.gloss ?? content.allSenses.map((s) => s.gloss).join(", "), frontLang: "en-US" };
+    setVoiceStatus(undefined);
     void voice.startCard(
       { front: front.front, ...(front.frontLang ? { frontLang: front.frontLang } : {}), back: spokenBack(content, settings.showVosotros) },
       handlers,
       { pauseSeconds: settings.voicePauseSeconds, listenSeconds: settings.voiceListenSeconds },
+      setVoiceStatus,
     );
     return () => voice.cancel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceMode, currentId, content, handlers]);
 
   useEffect(() => () => void voiceRef.current?.dispose(), []);
+
+  const toggleVoice = useCallback(async () => {
+    if (!settings) return;
+    const next: Settings["playback"] = settings.playback === "handsFree" ? "audioOn" : "handsFree";
+    voiceRef.current?.cancel();
+    setVoiceStatus(undefined);
+    setSettings(await repo.saveSettings({ playback: next }));
+  }, [settings]);
 
   if (phase === "loading" || !state || !settings) return <Spinner label="Building session…" />;
 
@@ -283,11 +317,21 @@ export function ReviewScreen() {
           {rs.remaining(state)} left
         </span>
         <div className="flex gap-1">
+          {isNative() && (
+            <button className={`rounded-lg px-2 py-1 ${voiceMode ? "bg-accent/20 text-accent" : ""}`} onClick={() => void toggleVoice()} title="Voice review">
+              🎙 {voiceMode ? "Voice on" : "Voice"}
+            </button>
+          )}
           <button className="px-2 py-1 disabled:opacity-30" disabled={state.history.length === 0} onClick={doUndo}>
             ↶ Undo
           </button>
         </div>
       </header>
+      {voiceMode && (
+        <div className={`mb-2 rounded-lg px-3 py-1.5 text-center text-xs ${voiceStatus?.phase === "listening" ? "bg-good/20 text-good" : voiceStatus?.phase === "error" ? "bg-again/20 text-again" : "bg-surface-2 text-muted"}`}>
+          {voiceStatusText(voiceStatus)}
+        </div>
+      )}
 
       <div
         className={`relative flex flex-1 touch-none flex-col rounded-3xl border-4 bg-surface p-6 shadow-xl transition-transform ${hintColor} ${dragging ? "" : "duration-200"}`}

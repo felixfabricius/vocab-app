@@ -119,7 +119,7 @@ export function Diagnostics() {
         <p className="text-sm text-muted">platform: {platform()}{isNative() ? " (native)" : ""}</p>
         <p className="text-sm text-muted">installed: {String(standalone)}</p>
         <p className="text-sm text-muted">origin: {window.location.origin}</p>
-        <p className="text-sm text-muted">storage: {storage}</p>
+        <p className="text-sm text-muted">storage: {storage}{isNative() ? " (the native web view's store is persistent regardless of the flag)" : ""}</p>
         <p className="text-sm text-muted">online: {String(navigator.onLine)}</p>
       </section>
 

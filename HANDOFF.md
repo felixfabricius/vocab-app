@@ -49,7 +49,7 @@ src/core/generator/      cards.ts (production per sense), paradigm.ts (verb×ten
 src/core/priority/       rank.ts (rank→class, phrase class), frequency.ts (loads frequency.json)
 src/core/dedupe/         exact lemma+pos identity, accent-insensitive did-you-mean only
 src/core/verbs/          regular.ts (conjugator + orthographic rules), index.ts (table lookup, reflexive pronouns)
-src/core/import/         paste.ts (VOCABAPP-IMPORT v1 + TSV lines), translateLog.ts (||| lines and JSON lines, rowsAfter/latestTimestamp)
+src/core/import/         paste.ts (VOCABAPP-IMPORT v1 + v2 + TSV lines), language.ts (looksSpanish)
 src/llm/schema.ts        zod schemas (nullable, not optional) + normalizeDraft
 src/llm/prompts/extract.ts   shared extraction prompt, formats "api" | "paste", PASTE_HEADER
 src/llm/client.ts        callClaude: beta.messages.parse, betaZodOutputFormat, effort low, cache_control on system, fallbacks [{model: claude-opus-4-8}] with beta server-side-fallback-2026-06-01, spend cap, usage meter
@@ -65,7 +65,9 @@ src/app/                 App.tsx (routes, boot: seed + trash purge), services.ts
 src/features/            today, review (ReviewScreen, CardView, useSwipe), entries (list, EntryScreen, enrichService), import (ImportScreen, BatchScreen, SuggestionEditor, importService), translate, grammar (GrammarScreen, tenseService), settings (SettingsScreen, Diagnostics), stats
 public/seed/essential.json   hand-authored ~150 Essential items (words + phrases, Chilean-aware), version 1
 public/data/verbs.json, frequency.json
-shortcuts/README.md      four Kurzbefehle, log format, import steps (German UI names)
+ios/                     Capacitor project: App/project.yml (xcodegen), App/App/Plugins/*.swift, Widgets/ (WidgetKit + Controls)
+src/native/              plugin facades: platform, tts, speech, translate, cloudFiles, audioSession, clipboard, deepLinks
+src/input/               InputSource seam: RemoteButtonsInput (EarPods), VoiceInput (voice review)
 ```
 
 ## 4. Data model (Dexie v1)
@@ -77,7 +79,7 @@ Semantics that matter:
 - `Card.fsrs` mirrors ts-fsrs Card in camelCase with ISO dates; `introducedOn` (day key) drives the daily new-card limit.
 - `ReviewLog.fsrsLog` keeps the library's log verbatim (needed by `rollback` for undo and by the optimizer later). `mode` field exists (tap/typed/audio/voice) but only "tap"/"audio" are written.
 - `Entry.tags` exists (seed writes `["seed"]`) but no UI uses tags yet. `Entry.sourceIds` links to `sources`.
-- `Settings` includes `anthropicKey`, `openaiKey`, `model` (default `claude-opus-5`), `dailySpendCapUsd` (warn at 1×, stop at 2×), `llmUsage` (monthly meter), `translateLogImportedUntil`, `showVosotros`, `playback` (display | audioOn | handsFree, the last unused), `voiceURI`, `speechRate`, `fsrsWeights` (unused), `seedVersion`.
+- `Settings` includes `anthropicKey`, `openaiKey`, `model` (default `claude-opus-5`), `dailySpendCapUsd` (warn at 1×, stop at 2×), `llmUsage` (monthly meter), `showVosotros`, `playback` (display | audioOn | handsFree = voice review), `voiceURI`, `speechRate`, `fsrsWeights` (unused), `seedVersion`, `translateProvider`, `cloud`, `voicePauseSeconds`, `voiceListenSeconds`.
 - Every mutation of the tracked tables writes an `outbox` row (table, rowId, op, at). `CloudSync` (M5) drains it into iCloud change files (settings rows excluded) and clears it; on the web nothing consumes it.
 - Backup file replaces or merges (newer `updatedAt` wins per row). Web storage and a native wrapper's WKWebView storage are different origins: migration = export + import.
 
@@ -115,7 +117,7 @@ Semantics that matter:
 ## 9. Translate today
 
 - In-app (native, since M3): Apple Translation framework by default (`src/native/translate.ts` over `TranslatePlugin.swift`), Claude as the explicit button; own mic button streams on-device recognition per direction (`NativeLiveTranscriber` over `SpeechPlugin.swift`); every lookup is a `lookups` row; "Create cards" on Import turns unconsumed lookups into an enriched drafts table. The web app keeps Claude + Whisper.
-- Lock screen: four Kurzbefehle (see `shortcuts/README.md`) using Apple's on-device Translate; each appends `date ||| dir ||| input ||| translation` to `iCloud Drive/Kurzbefehle/vocab-import/translate-log.txt`. Import picks the file; only rows newer than `settings.translateLogImportedUntil` are used; items ≤ 8 words become drafts, longer ones are skipped.
+- Lock screen: the app's own widgets and Controls (`ios/Widgets/`) open `alaluna://translate?dir=…`. The phase-1 Shortcuts path was removed on 2026-09-22 (T9); rows imported from it keep `provider: "shortcuts"`.
 
 ## 10. Facts that constrain the native phase
 

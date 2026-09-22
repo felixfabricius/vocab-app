@@ -6,6 +6,7 @@ import { draftContext, llmEnv } from "@/app/llmEnv";
 import { useSettings } from "@/app/useSettings";
 import type { Lookup, Settings } from "@/core/types";
 import { translateWithClaude, type TranslateOutput } from "@/llm/pipelines";
+import { Keyboard } from "@capacitor/keyboard";
 import { isNative } from "@/native/platform";
 import { packStatus, translateOffline, type PackStatus } from "@/native/translate";
 import { NativeLiveTranscriber } from "@/speech/LiveTranscriber";
@@ -160,6 +161,7 @@ function Panel({ dir, title, settings, autoFocus, history, onLookup }: { dir: Di
     }
   }
 
+  const [focused, setFocused] = useState(false);
   const spanish = dir === "en-es" ? result?.translation : text.trim();
   const micSupported = native || Recorder.supported();
   const offlineReady = offlineDefault && pack === "installed";
@@ -167,7 +169,21 @@ function Panel({ dir, title, settings, autoFocus, history, onLookup }: { dir: Di
 
   return (
     <Card className="mb-4">
-      <h2 className="mb-2 font-medium">{title}</h2>
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="font-medium">{title}</h2>
+        {focused && (
+          <button
+            className="rounded-lg bg-surface-2 px-3 py-1 text-sm text-accent"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => {
+              field.current?.blur();
+              if (native) void Keyboard.hide().catch(() => undefined);
+            }}
+          >
+            Done
+          </button>
+        )}
+      </div>
       {msg && <div className="mb-2 rounded-lg bg-surface-2 p-2 text-xs">{msg}</div>}
       {native && pack && pack !== "installed" && (
         <div className="mb-2 rounded-lg bg-easy/10 p-2 text-xs text-easy">
@@ -183,6 +199,8 @@ function Panel({ dir, title, settings, autoFocus, history, onLookup }: { dir: Di
           onChange={(e) => setText(e.target.value)}
           lang={inputLang}
           enterKeyHint="go"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
