@@ -46,6 +46,9 @@ export function CardFront({ content, showHint, onToggleHint }: { content: CardCo
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
         <span className="text-xs uppercase tracking-wide text-muted">conjugation</span>
         <div className="text-4xl font-semibold">{content.entry.lemma}</div>
+        {content.allSenses.length > 0 && (
+          <div className="text-sm text-muted">{content.allSenses.map((s) => s.gloss).join(" · ")}</div>
+        )}
         <div className="text-xl text-accent">{content.paradigm.tenseLabel}</div>
         <div className="mt-2 text-sm text-muted">recite every person, then reveal</div>
         <div className="absolute bottom-6 text-xs text-muted">tap to reveal</div>
@@ -104,6 +107,9 @@ export function CardBack({ content, showVosotros, onSpeak }: { content: CardCont
         <div className="text-2xl font-semibold">
           {entry.lemma} <span className="text-base text-accent">· {content.paradigm.tenseLabel}</span>
         </div>
+        {content.allSenses.length > 0 && (
+          <div className="text-sm text-muted">{content.allSenses.map((s) => s.gloss).join(" · ")}</div>
+        )}
         <ParadigmTable forms={content.paradigm.forms} showVosotros={showVosotros} onSpeak={onSpeak} />
         {content.paradigm.source === "regular" && <div className="text-xs text-muted">regular pattern</div>}
       </div>

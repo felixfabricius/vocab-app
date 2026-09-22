@@ -12,7 +12,9 @@ export const PrioritySchema = z.enum(["essential", "core", "standard", "niche"])
 export const CefrSchema = z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]);
 export const RegionalSchema = z.enum(["neutral", "chile"]); // VARIETY
 
-const SpanSchema = z.tuple([z.number().int().min(0), z.number().int().min(0)]).nullable();
+// A fixed-length array rather than z.tuple: tuples emit `"items": false`, a boolean
+// sub-schema that the Anthropic SDK's schema transformer rejects.
+const SpanSchema = z.array(z.number().int().min(0)).min(2).max(2).nullable();
 
 export const SentenceOutSchema = z.object({
   es: z.string(),
@@ -80,8 +82,10 @@ export const TranslateResultSchema = z.object({
 });
 export type TranslateResult = z.infer<typeof TranslateResultSchema>;
 
-function spanOf(es: string, target: string | null, span: [number, number] | null): [number, number] | undefined {
-  if (span && span[1] > span[0] && span[1] <= es.length && es.slice(span[0], span[1]).trim().length > 0) return span;
+function spanOf(es: string, target: string | null, span: number[] | null): [number, number] | undefined {
+  const a = span?.[0];
+  const b = span?.[1];
+  if (a !== undefined && b !== undefined && b > a && b <= es.length && es.slice(a, b).trim().length > 0) return [a, b];
   if (target) {
     const i = es.toLowerCase().indexOf(target.toLowerCase());
     if (i >= 0) return [i, i + target.length];
