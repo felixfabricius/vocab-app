@@ -71,6 +71,15 @@ jobs:
           FORCE_MATCH: ${{ inputs.force_match }}
           FASTLANE_SKIP_UPDATE_CHECK: "1"
 
+      - name: Show provisioning profile entitlements
+        if: always()
+        run: |
+          for p in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.mobileprovision; do
+            echo "== $p"
+            security cms -D -i "$p" | plutil -extract Entitlements xml1 -o - - || true
+            security cms -D -i "$p" | plutil -extract Name raw -o - - || true
+          done
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
