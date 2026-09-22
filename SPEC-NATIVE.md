@@ -1,187 +1,181 @@
 # Spec: from web app to native iOS app (phase 2)
 
-Status: draft for alignment, 2026-09-21. Nothing in here is decided unless marked **decided**.
-Open questions are numbered **Q1…Q26** and collected at the end so they can be answered in one go.
+Status: revision 2, 2026-09-21, with your answers to Q1–Q22 folded in. Items marked **decided** are settled.
+Remaining open questions are numbered **Q1, Q4, Q23–Q25** and collected at the end.
 `SPEC.md` stays the source of truth for everything this document does not change.
 
 ## 0. Where we are
 
 - The web app (installed from Safari) is in daily use: review, seed, imports, translate tab, Shortcuts-based lock-screen translate.
-- Apple Developer Program: approved. TestFlight is therefore available; App Review is not needed for personal use.
-- Fixed on 2026-09-21: every Claude call failed with "JSON schema must have a type defined…" (a `z.tuple` in the output schema). Conjugation cards now show the verb's English meaning on both sides.
-- Still open from the web phase and carried into this spec: Francisca voice not selectable in the web app, "Easy" grade still present, no voice review, no in-app offline translation, no sync.
+- Apple Developer Program approved. TestFlight is available; App Review is not needed for personal use.
+- Fixed 2026-09-21: every Claude call failed on a schema-validation error (`z.tuple` in the output schema). Conjugation cards show the verb's English meaning on both sides.
+- Carried into this spec from the web phase: Francisca voice not selectable in the web app, "Easy" grade still present, no voice review, no in-app offline translation, no sync.
 
-## 1. Platform decision
+## 1. Decisions so far
 
-Two credible routes. The choice affects everything below, so it comes first.
+| Topic | Decision |
+|---|---|
+| Minimum iOS | **26** (your phone's version; unlocks SpeechAnalyzer for long-form on-device recognition and the newest Translation/Controls APIs) |
+| Build pipeline | **GitHub Actions** macOS runners with fastlane; no Xcode Cloud |
+| Cloud Mac | Acceptable if it earns its cost; default is CI. See §2.3 for what it buys under each platform option |
+| Translate-log enrichment | **Automatic on import** |
+| Lookups → cards | **Manual trigger** that gathers every lookup since the last run (in-app history; the Shortcuts file while it still exists), drafts, enriches, shows the table |
+| Manual add | **One free field (Spanish or English) + optional other side + optional tag + "Complete with AI"** |
+| Word/phrase split | **Target count + phrase preference (few / balanced / many)**, guidance not fraction |
+| Series prompt scope | Everything except **very basic** words (Claude told to skip the ~200 most common function and survival words); the app filters known items |
+| Tags | **One tag per batch**, stored on every entry of the batch |
+| Groups words / phrases / from-sentences | **Stored, not shown**; the drafts table is flat |
+| Grading | **Again / Good only**; swipe right = Good, left = Again |
+| Study by tag | **Due + learning + new by default, "include everything" toggle**; counts toward "introduced today"; the daily new-card limit stays a one-tap setting |
+| Voice review | **Level 1 now** (screen on), architecture ready for level 2 (locked in pocket); **silence: repeat once, then skip ungraded** |
+| Translate entry points | **Lock-screen widget + bottom-corner control, plus home-screen widget**, all deep-linking into the translate screen; **no Siri intent** |
+| Translate lookups | **Every lookup becomes a draft** |
+| Storage | **iCloud Drive app container** (snapshot + change log); no Windows access needed now |
+| Shortcuts | **Removed** once the widget/control path works |
+| Web app | **Frozen** once the native app works; no parallel deployment |
+| Order of work | As in §8 |
 
-| | A. Capacitor wrapper around the existing web app | B. Native SwiftUI rewrite |
-|---|---|---|
-| Reuse | ~90 % of current code (review, scheduler, imports, parsers, prompts, storage) | Core logic must be ported to Swift: FSRS (swift-fsrs exists), session builder, import service, paste parser, prompt builders |
-| Native pieces needed anyway | Small Swift plugins: text-to-speech with voice selection, speech recognition, Translation framework, iCloud container, remote-control buttons, background audio session, widget + App Intent extension | Same features, but first-class: WidgetKit, App Intents, AVSpeech, SFSpeech/SpeechAnalyzer, Translation, CloudKit or iCloud Drive |
-| Fit with your constraints | Development stays on Windows in TypeScript; Swift is confined to ~6 small files | Every change needs a macOS build to see; without a Mac the loop is CI → TestFlight (15–25 min) |
-| UI quality | Web view; fine for this app, no Liquid Glass, keyboard/scroll quirks occasionally | Native feel, system components |
-| Risk | Plugin maintenance; Xcode project edits (extension targets) without a Mac are painful | Time: realistically 3–5× the effort of A before feature parity |
+## 2. Platform: Capacitor wrapper vs SwiftUI rewrite (still open, Q1)
 
-Recommendation: **A**, with the web app kept as-is inside the wrapper, and a rule that anything needing an OS API becomes a small Swift plugin behind the existing seams (`ARCHITECTURE.md`). Revisit B only if the web view turns out to be the bottleneck for hands-free review.
+### 2.1 Does the swipe survive a Capacitor wrapper?
 
-- **Q1.** Capacitor wrapper (A) or SwiftUI rewrite (B)?
-- **Q2.** Minimum iOS version: 18 (Translation framework, controls) or 26 (SpeechAnalyzer for long-form on-device recognition, your phone's version)? iOS 26 is simpler if the phone is the only target.
+Yes. The card uses pointer events with `touch-none` on the element, which WKWebView delivers exactly like Safari. The wrapper turns off the web view's own edge-swipe navigation (Capacitor default) and rubber-band scrolling (`ios.scrollEnabled: false`), so nothing competes with the gesture. Tinder-style is the current behaviour: right = Good (yes), left = Again.
 
-## 2. Build and delivery without a Mac
+### 2.2 Feature by feature: what needs Swift anyway, what is SwiftUI-only
 
-- Bundle id, app name, App Store Connect record: created once in the ASC web UI (no Mac needed).
-- Signing: certificates and profiles created and stored by `fastlane match` running on a GitHub Actions macOS runner, using an App Store Connect API key. No personal Mac involved.
-- Build + upload: GitHub Actions macOS runner runs `pnpm build`, `cap sync`, `xcodebuild archive`, uploads to TestFlight. Free tier ≈ 200 macOS minutes/month, one build ≈ 15 min. Alternative: Xcode Cloud (25 h/month included with the program), configured from App Store Connect; verify that first-time workflow creation works without Xcode.
-- The iOS project itself: generated once (`cap add ios`, SPM package manager so no CocoaPods) and committed. Extension targets (widget, App Intents) cannot be added sensibly by hand-editing the project file; options: generate the project from a YAML spec with `xcodegen` in CI, or rent a cloud Mac for a day for that step.
-- Install on the phone: TestFlight app, internal tester = you. Builds expire after 90 days; CI re-uploads on every push to `main`.
-- Data migration from the web app: Settings → Export backup in the web app, Import backup in the native app. Already implemented. Web storage and the wrapper's storage are separate origins, so this is a one-time manual step.
+"Plugin" = a small Swift file exposed to the web app through Capacitor's bridge. Rough sizes are lines of Swift.
 
-- **Q3.** GitHub Actions + fastlane, or Xcode Cloud?
-- **Q4.** Are you willing to rent a cloud Mac for one or two sessions (widget extension, first signing run, on-device debugging), or must everything go through CI?
-
-## 3. Card creation
-
-### 3a. Fully in-app, with the API key on the phone
-
-**Translate log → cards, automatic.** On import of `translate-log.txt`, every new lookup becomes a draft, and the app immediately calls Claude to enrich the batch (one call per 20 items): one example sentence, gender/article, priority, regional tag, note. Result lands in the drafts table (3c) for review. Cost: about a cent per lookup.
-
-- **Q5.** Should the enrichment run automatically on import (current behaviour is a manual "Enrich" button), or only after you have accepted the drafts, so excluded lookups cost nothing?
-- **Q6.** The Shortcuts still write the log to iCloud Drive and the app imports it with a file picker. Natively the app can read that file itself on launch (iCloud Drive container, see §6) and do the import unattended. Wanted?
-
-**Manual add.** Proposed minimal form: one text field that accepts Spanish *or* English, an optional second field for the other language, an optional tag, then **Complete with AI**, which fills everything else (part of speech, gender/article, senses, sentence, priority, regional, note) and shows the result as an editable draft before saving. Without a key the form saves what was typed.
-
-- **Q7.** Is that the right minimal form, or do you want part of speech and tag as required fields?
-
-### 3b. Claude-app based, no API calls in the app
-
-The app is the parser, deduper and completer; Claude in the Claude app is the extractor. Flow: prompt builder → copy → Claude app (with photo or subtitle text) → copy reply → paste into the app → drafts table.
-
-**Format (decided in the web phase, kept):** a fenced JSON block headed `VOCABAPP-IMPORT v1`, schema in `src/llm/schema.ts`. Proposed additions for v2: a batch-level `tag`, per-item `sentenceSource` ("series" | "generated"), and `episodeRef`. Old v1 blocks stay accepted.
-
-**What Claude supplies:** lemma, part of speech, gender + article, meanings, priority estimate, regional flag, note, one sentence (from the source when the item occurred in it, otherwise generated), phrase flag, verb irregularity.
-
-**What the app fills in:** duplicate check against the collection and the ignore list, frequency rank → priority override for single words, conjugation tables from the bundled verb table, paradigm cards for active tenses, audio via the system voice, tag assignment, encounter/highlight spans.
-
-**Prompt builders** (input fields + Copy button, all sharing one base prompt with the format rules):
-
-| Builder | Variables | Notes |
-|---|---|---|
-| Series episode | series, season/episode, tag (default: series name), target item count, phrase preference (few / balanced / many) | Sentences taken from the subtitles themselves; phrases include collocations (hacer planes) and slang if it recurs |
-| Textbook page | tag (default: book name + page) | Everything on the page; adjacent English/German glosses used as hints |
-| Book page | tag, density (only unknown-looking words / all content words / everything) | Density is a rough instruction; the app dedupes anyway |
-| Context | free-text situation ("playing basketball with Chileans"), target count | No source text; Claude invents the items and sentences |
-
-- **Q8.** Fraction of single words vs phrases: fixed number, or guidance only? Proposal: a target *count* plus a three-way phrase preference, and the instruction "prefer a phrase over its parts whenever the phrase is not derivable from them". A hard fraction would force filler in episodes that are mostly one or the other.
-- **Q9.** Should the series prompt also ask for the 20 most useful *unknown-looking* items only, or for everything and let the app filter known ones? (Claude does not know your collection; the known-lemma list can be pasted into the prompt but it is already 300+ words and growing.)
-- **Q10.** Tag semantics: one tag per batch (simple) or multiple tags per entry (episode + series + "slang")?
-
-### 3c. Batch overview (applies to every multi-card job)
-
-Replace the current grouped inbox with a **drafts table**: one row per draft, columns front (English) / back (Spanish, with article), a class chip, a status icon (new / known / did-you-mean). Rows are removable with a swipe, editable with a tap (sheet). A header shows counts and, while a job runs (enrichment, log import), a progress bar with cancel. Accept saves all remaining rows.
-
-- **Q11.** Keep the three groups (words / phrases / from sentences) as sections inside the table, or a flat list sorted by class?
-
-## 4. Review
-
-**Grading (decided by you): Again / Good only.** Easy is removed from buttons and swipes. Swipe right = Good, swipe left = Again; up does nothing. FSRS handles binary grading without changes.
-
-**Study by tag.** A second entry point beside "Review": pick a tag, get every active card whose entry carries it, in the order due → learning → new, ignoring the daily new-card limit and the session cap. Grades update FSRS exactly as in a normal session, so a card reviewed here is simply not due in the normal session later. Cards introduced here count as "introduced today" for the normal limit (otherwise the same day could introduce 20 + N new cards); this is the one coupling.
-
-- **Q12.** Include cards that are not due yet (ahead of schedule)? Doing so is "cramming"; FSRS tolerates it but it inflates stability less than a due review would. Proposal: include only due, learning and new cards by default, with an "include everything" toggle.
-- **Q13.** Should tag study count toward "introduced today", as proposed, or be fully independent?
-
-**Voice review (sí / no).** Two levels:
-
-1. *Screen on, phone in hand or on the table:* front is spoken, pause, you may speak the answer, back is spoken, then the microphone listens for "sí" / "no" (also "yes" / "no", "otra vez" = repeat). On-device recognition; no cost. Feasible in the wrapper with a plugin.
-2. *Phone locked in the pocket:* requires the audio background mode, an audio session in play-and-record, and continuous on-device recognition restarted every minute (SFSpeechRecognizer) or a long-form SpeechAnalyzer session (iOS 26). Feasible but the most fragile feature in this spec: battery, orange mic indicator, iOS may still suspend after long inactivity, wired EarPods mic works but picks up pocket noise. Effort: roughly the same as everything else in §4 combined.
-
-Cheaper hands-free path that works locked: wired EarPods buttons via the remote command centre (one press Good, two presses Again, three presses repeat). Rock solid on iOS, no microphone, no recognition.
-
-- **Q14.** Build level 1 only, or also level 2? Proposal: level 1 plus EarPods buttons now; level 2 later if the buttons are not enough.
-- **Q15.** In voice mode, silence after the answer: repeat once then skip ungraded (current spec), or treat silence as Again?
-
-**Francisca voice.** The web app cannot see enhanced voices through Safari, which is why only Mexican and Spain voices appear. Natively, `AVSpeechSynthesisVoice.speechVoices()` lists downloaded enhanced voices, so Francisca (es-CL) becomes selectable; the app defaults to the first es-CL voice. To verify on the first TestFlight build.
-
-**Conjugation cards:** English meaning on both sides (done). Paradigm audio: forms read one after another with a short gap (already implemented).
-
-## 5. Translate
-
-**In-app, default offline.** Apple's Translation framework (iOS 18+) with the Spanish and English packs installed once; runs on device, free. Claude stays an explicit button per lookup. Each result has a speaker button (Francisca for Spanish, system English voice for English). Lookups are logged in the app's own history and become drafts exactly like the Shortcuts log. The Shortcuts can then be retired or kept as a fallback.
-
-**Home screen / lock screen.** Widgets on iOS cannot contain text fields or keyboards; they only display content and offer buttons. So "translation fields on the home screen" is not possible as a widget. What is possible:
-
-| Option | Taps to first keystroke | Works locked |
-|---|---|---|
-| Home-screen widget with two buttons (EN→ES, ES→EN) that open the app straight into the translate screen with the keyboard already up | 1 | No (unlock, then 1) |
-| Lock-screen widget / bottom-corner control doing the same | 1 after Face ID | Yes |
-| Siri / App Intent: "Hey Siri, Spanish for 'where is the bathroom'" — spoken answer, no UI | 0 | Yes |
-| Keep the Shortcuts | 1 after Face ID, then their own UI | Yes |
-
-- **Q16.** Which of these do you want first? Proposal: widget + lock-screen control that deep-link into the translate screen, plus the App Intent for Siri.
-- **Q17.** Should the in-app translate history *automatically* create drafts (every lookup) or only on tap ("Add as card")? The Shortcuts log currently creates drafts for everything short.
-
-## 6. Storage and sync
-
-Today: IndexedDB on the phone, manual JSON backup. Options for "not tied to the phone":
-
-| Option | What it gives | Effort | Limits |
+| Feature | Capacitor wrapper | SwiftUI rewrite | Verdict |
 |---|---|---|---|
-| **iCloud Drive app container** | The app writes a JSON snapshot plus an append-only change log into its own iCloud folder; iOS syncs it; the folder is visible in the Files app and on any Mac/PC with iCloud Drive | Small Swift plugin (container URL + file coordination) | One writer at a time; a second device would need merge logic (the outbox already exists for that) |
-| **CloudKit private database** | Structured per-record sync between your devices, Apple-hosted, free | Medium; Swift plugin or a Capacitor community plugin; schema per table | iOS/macOS only; not readable from Windows |
-| **Own endpoint** (Cloudflare Worker + D1) | Platform-independent, reachable from the PC, basis for any future second user | Medium; auth token, sync protocol over the outbox | Not free forever if it grows; you run it |
-| Backup only (status quo, automated) | Nightly JSON export to the iCloud container | Smallest | Restore is manual |
+| Tinder swipe, review UI, drafts table, editors, settings | Existing code, unchanged | Rewrite in SwiftUI | Wrapper wins on effort; parity only |
+| FSRS scheduling, session builder, import parsers, prompt builders, dedupe | Existing TypeScript, tested | Port to Swift (swift-fsrs exists; the rest is hand-ported) | Wrapper wins; the logic is the hard-won part |
+| Francisca voice (AVSpeechSynthesizer, downloaded enhanced voices) | Plugin, ~60 lines, or `@capacitor-community/text-to-speech` | Direct | Same result either way |
+| Voice grading level 1 (screen on): on-device recognition of sí/no | Plugin, ~120 lines | Direct | Same |
+| Voice grading level 2 (locked in pocket) | Audio background mode + keep-alive session in a plugin; the review loop stays in JS. JavaScript in a WKWebView keeps running while the app process is kept alive by audio, but Apple does not guarantee it. Fallback: move the loop into the plugin (~300 lines) | Direct; the loop is native from the start | **Native is safer**; wrapper works with a fallback plan |
+| Wired EarPods buttons (remote command centre) | Plugin, ~40 lines | Direct | Same |
+| Offline translation (Translation framework) | The API is SwiftUI-shaped (`translationTask`); the plugin hosts an invisible SwiftUI view, ~100 lines | Direct | Same result; wrapper slightly awkward |
+| Lock-screen widget, bottom-corner control, home-screen widget | An extension target written in Swift/SwiftUI **in both cases** (WidgetKit UI is always SwiftUI), sharing state through an App Group. The Xcode project needs the extra target: generated by `xcodegen` in CI, or added once on a Mac | Same extension, added in Xcode | Same work; project plumbing is easier with a Mac |
+| Deep link opens translate screen **with the keyboard already up** | WKWebView blocks programmatic keyboard display without a tap; needs a small web-view configuration override | Trivial | **Native cleaner**; wrapper needs a known workaround |
+| Dictation language following the direction | Keyboard dictation follows the keyboard language in both. Our own mic button with on-device recognition in the direction's language works identically in both (plugin vs direct) | Same | Same |
+| iCloud Drive container (snapshot + change log) | Plugin, ~80 lines + entitlement | Direct | Same |
+| Keychain for the API key | Community plugin | Direct | Same |
+| System look (Liquid Glass, native lists, haptics, Dynamic Type) | Web look; haptics via plugin | Native | **SwiftUI only** |
+| Live Activities / Dynamic Island for a running review | Not sensible through a web view | Possible | **SwiftUI only**, not requested |
+| Debugging on device | Safari Web Inspector needs a Mac; console logs via TestFlight feedback otherwise | Xcode on a Mac | Both want a Mac for debugging |
 
-Recommendation: iCloud Drive container with snapshot + change log as the first step (covers "not tied to the phone", makes the data visible on your PC through iCloud for Windows, and the Windows side can later become the second writer through the change log). CloudKit only if a second Apple device appears; the Worker only if the PC needs to write or a second person joins.
+Summary: nothing you asked for is impossible in the wrapper. Three items are cleaner natively: the locked-phone voice loop, the keyboard-up deep link, and the overall look. Everything else is the same Swift either way, because widgets and system frameworks are Swift regardless of what draws the screens.
 
-- **Q18.** Is "readable and restorable from the PC" the goal, or true multi-device editing?
-- **Q19.** Is iCloud for Windows installed or acceptable on the PC?
+### 2.3 What a rented Mac buys, per option
 
-## 7. Other
+| Need | Wrapper (A) | SwiftUI rewrite (B) |
+|---|---|---|
+| Adding the widget extension target to the Xcode project | One session, or `xcodegen` in CI instead | Same |
+| First signing run, entitlement mistakes (iCloud container, App Groups, background modes) | Usually solvable from CI logs; one session saves a day of 20-minute retries | Same |
+| Debugging a crashing plugin or a mis-configured audio session | Xcode console on the simulator; otherwise blind through TestFlight | Same, but far more often |
+| Day-to-day UI development | Not needed: web UI runs in the browser on Windows | **Essential**: SwiftUI previews and the simulator are how SwiftUI is written; via CI alone each look takes 20 minutes |
+| Running on the physical iPhone from Xcode | Not possible from a cloud Mac (no USB; wireless debugging needs the same network); TestFlight remains the install path | Same limitation |
+| Verdict | **Low value** for A: optional, one or two sessions at most; CI covers the rest | **High value** for B: without a Mac, B is not realistic |
 
-- The API key moves from web storage to the iOS Keychain (Capacitor secure-storage plugin). Still personal use; no server.
-- Shortcuts: keep the four for now; retire once the widget/control path exists (Q16).
-- Non-commercial licence of the verb table: fine for TestFlight/personal use; blocks a paid App Store listing.
-- Not in phase 2: pre-generated cloud audio (Azure), Batch API queue, multi-user, Android.
+Rental options, all controlled by remote desktop or VNC from Windows; prices are rough and worth re-checking:
 
-- **Q20.** App name and bundle identifier (e.g. `in.fabricius.vocab`)?
-- **Q21.** Should the web app keep being deployed in parallel (as a fallback), or freeze it once TestFlight works?
+| Option | Cost | Notes |
+|---|---|---|
+| MacinCloud pay-as-you-go | about $1 per hour, no minimum | Shared server, fine for a few sessions |
+| MacinCloud managed | $30–60 per month | Always-on dedicated login |
+| Scaleway Mac mini (Apple silicon) | about €0.10–0.20 per hour, 24-hour minimum | Cheapest per day among dedicated options |
+| AWS EC2 Mac | about $0.65–1.10 per hour, 24-hour minimum | Enterprise-grade, overkill here |
+| Used Mac mini M1 | €350–450 once | Pays for itself after a few months of rental; also fixes debugging permanently |
 
-## 8. Suggested order of work (after answers)
+### 2.4 Recommendation
 
-1. Wrapper + CI + TestFlight with the web app unchanged. Verify Francisca, camera, storage, mic.
-2. Grading and swipe change, study by tag, drafts table.
-3. Translate in-app (Translation framework) + speaker button + history → drafts; automatic log enrichment.
+Wrapper (A). The only feature where native is materially better is voice review level 2, which you have deferred. Should level 2 later prove unreliable in the wrapper, the review loop alone moves into a native plugin; the rest of the app is unaffected.
+
+- **Q1.** Wrapper (A) or SwiftUI rewrite (B), given §2.2–2.3?
+- **Q4.** If A: rent a Mac for one session to add the widget target and run the first signing, or go CI-only with `xcodegen`? If B: the Mac is required; rental or purchase?
+
+## 3. Build and delivery **(decided: GitHub Actions)**
+
+- App Store Connect record created once in the web UI.
+- **App name** is the label under the icon and in TestFlight; changeable later. **Bundle identifier** is the reverse-DNS id that uniquely identifies the app to Apple, e.g. `in.fabricius.vocab`; it cannot be changed after the first upload without creating a new app. It also seeds the iCloud container (`iCloud.in.fabricius.vocab`) and App Group (`group.in.fabricius.vocab`) names.
+- Signing: `fastlane match` on the runner with an App Store Connect API key creates and stores certificates and profiles in a private repo; nothing is done on a personal machine.
+- Pipeline on push to `main`: `pnpm build` → `cap sync ios` → `xcodebuild archive` → upload to TestFlight (internal tester: you). Free tier ≈ 200 macOS minutes/month, one build ≈ 15 minutes.
+- iOS project: generated once with Capacitor 7 and SPM (no CocoaPods), committed. Extension targets per Q4.
+- Data migration from the web app: Export backup → Import backup (exists). One-time, manual.
+
+- **Q25.** Confirm app name `Vocab` and bundle id `in.fabricius.vocab`, or choose others.
+
+## 4. Card creation
+
+### 4a. In-app, with the API key on the phone
+
+**Lookups → cards (decided).** A single **"Create cards from lookups"** button on Import, with a badge on Today showing how many lookups are waiting. It collects every lookup since the last run from the in-app translate history (and, until the Shortcuts are removed, from the Shortcuts file if the app can read it, else via the picker), creates one draft per lookup, enriches the batch automatically with Claude (sentence, gender/article, priority, regional tag, note), and opens the drafts table. Every lookup becomes a draft, including full sentences; those appear as phrase-type drafts you can delete in the table.
+
+**Manual add (decided).** One field accepting Spanish or English, optional other-language field, optional tag, **Complete with AI** fills the rest and shows an editable draft. Without a key it saves what was typed.
+
+### 4b. Claude-app based, no API calls in the app
+
+Flow: prompt builder → Copy → Claude app (with photo or subtitle text) → copy the reply → paste into the app → drafts table.
+
+**Format:** `VOCABAPP-IMPORT v2`, backwards compatible with v1. Additions: batch-level `tag`, per-item `sentenceSource` (`"source"` | `"generated"`), `glossSource` (original German gloss when the source was German).
+
+**Claude supplies:** lemma, part of speech, gender + article, English meanings, priority estimate, regional flag, note, one sentence (from the source when the item occurred in it, otherwise generated), phrase flag, verb irregularity.
+
+**The app fills in:** duplicate check against the collection and the ignore list, frequency-rank → priority override for single words, conjugation tables from the bundled verb table, paradigm cards for active tenses, audio via the system voice, the batch tag, highlight spans.
+
+**Prompt builders** (fields + Copy button, one shared base prompt):
+
+| Builder | Fields | Behaviour |
+|---|---|---|
+| Series episode | series, season/episode, tag (default: series), target count, phrase preference | Sentences taken from the subtitles; phrases include collocations and recurring slang; very basic words excluded |
+| Textbook page | tag (default: book + page) | Everything on the page; glosses in English; a German gloss is translated to English and kept as `glossSource` |
+| Book page | tag, density (unknown-looking words / all content words / everything) | Density is guidance; the app dedupes |
+| Context | situation text, target count | No source text; items and sentences invented for the situation |
+
+- **Q23.** German textbook glosses: keep the German as a visible secondary line on the card back, editor-only, or drop it after translation? Default if no answer: editor-only.
+
+### 4c. Drafts table (applies to every multi-card job)
+
+One row per draft: front (English) and back (Spanish with article), a class chip, a status icon (new / known / did-you-mean). Swipe a row to remove, tap to edit in a sheet. A header shows counts and, while a job runs (enrichment, lookup import), a progress bar with cancel. **Accept** saves all remaining rows. Group membership is stored on the draft but not displayed.
+
+## 5. Review
+
+**Grading (decided):** Again / Good. Up-swipe removed. Buttons mirror the swipes.
+
+**Study by tag (decided).** Beside "Review": pick a tag → every active card whose entry carries it, due → learning → new, ignoring session cap and daily new limit; toggle "include everything" adds cards not yet due. Grades update FSRS as usual. New cards graded here count toward "introduced today". The daily new-card limit gets a quick-adjust control on the Today screen.
+
+**Voice review level 1 (decided).** Screen on. Front spoken → pause (you may answer aloud) → back spoken → microphone listens for sí / no / yes / no / "otra vez" (repeat). On-device recognition in es-CL with a tiny vocabulary. Silence: repeat the back once, then skip ungraded. Architecture for level 2 later: the loop is a `VoiceInput` implementation of the existing `InputSource` seam plus the `Transcriber` seam; level 2 adds the audio background mode and a keep-alive session, or moves the loop natively if JS proves unreliable when locked (§2.2).
+
+**EarPods buttons.** One press Good, two presses Again, three presses repeat, via the remote command centre. Works locked; independent of voice.
+
+**Francisca.** Native voice list exposes downloaded enhanced voices; default to the first es-CL voice; verify on the first build.
+
+## 6. Translate
+
+**In-app (decided).** Default offline via the Translation framework (Spanish and English packs installed once). Claude stays an explicit button. Speaker button on every result. Every lookup is logged and becomes a draft on the next "Create cards from lookups".
+
+**Dictation (decided: own mic button).** Keyboard dictation follows the keyboard language, so the app gets its own mic button per field that runs on-device recognition in the direction's language: English for EN→ES, Spanish (Chile) for ES→EN. The keyboard's dictation key keeps working too.
+
+**Entry points (decided):** lock-screen widget, bottom-corner control, home-screen widget, each with EN→ES and ES→EN buttons that deep-link into the translate screen with the field focused. No Siri intent. Shortcuts removed once this works.
+
+## 7. Storage (decided: iCloud Drive container)
+
+The app writes `snapshot.json` (full export) whenever it goes to the background, plus `changes/*.jsonl` from the existing outbox after each session. On launch it compares the local and iCloud snapshots and merges the newer rows. The folder is visible in the Files app under the app's name, so a restore on a new phone is automatic and a manual copy is always possible. Multi-device editing is out of scope; the change log keeps the door open.
+
+## 8. Order of work (decided)
+
+1. Wrapper + CI + TestFlight with the web app unchanged. Verify Francisca, camera, storage, microphone.
+2. Grading and swipe change, study by tag, drafts table, tag on entries.
+3. Translate in-app (Translation framework, speaker button, mic buttons, history) → "Create cards from lookups" with automatic enrichment; manual add with AI complete.
 4. Prompt builders and format v2.
 5. iCloud container storage.
-6. Widget/control + App Intent.
-7. Voice review level 1, EarPods buttons; level 2 if wanted.
+6. Widgets and control with deep links; remove Shortcuts.
+7. Voice review level 1, EarPods buttons.
 
-- **Q22.** Agree with the order, or should translate/widgets come before study-by-tag and the drafts table?
-
-## Open questions, collected
+## Open questions, remaining
 
 | # | Topic | Question |
 |---|---|---|
-| Q1 | Platform | Capacitor wrapper (A) or SwiftUI rewrite (B)? |
-| Q2 | Platform | Minimum iOS 18 or 26? |
-| Q3 | Build | GitHub Actions + fastlane or Xcode Cloud? |
-| Q4 | Build | Cloud Mac for one or two sessions acceptable? |
-| Q5 | Creation | Enrich translate-log drafts automatically on import, or after acceptance? |
-| Q6 | Creation | App reads the Shortcuts log from iCloud itself, unattended? |
-| Q7 | Creation | Manual-add form: one free field + AI complete, or more required fields? |
-| Q8 | Creation | Word/phrase split: count + preference, or a fixed fraction? |
-| Q9 | Creation | Series prompt: everything (app filters) or "most useful N"? |
-| Q10 | Creation | One tag per batch or multiple tags per entry? |
-| Q11 | Creation | Drafts table: sections or flat list? |
-| Q12 | Review | Tag study includes not-yet-due cards? |
-| Q13 | Review | Tag study counts toward "introduced today"? |
-| Q14 | Review | Voice review: level 1 (+ EarPods buttons) only, or also locked-in-pocket? |
-| Q15 | Review | Silence in voice mode: skip or Again? |
-| Q16 | Translate | Widget/control deep link, Siri intent, Shortcuts: which first? |
-| Q17 | Translate | In-app lookups auto-create drafts or on tap? |
-| Q18 | Storage | PC-readable backup, or multi-device editing? |
-| Q19 | Storage | iCloud for Windows on the PC acceptable? |
-| Q20 | Other | App name and bundle id? |
-| Q21 | Other | Keep deploying the web app in parallel? |
-| Q22 | Plan | Order of work as proposed? |
+| Q1 | Platform | Wrapper (A) or SwiftUI rewrite (B)? See §2.2–2.4 |
+| Q4 | Build | If A: one Mac session for the widget target and first signing, or CI-only with xcodegen? If B: rent or buy? |
+| Q23 | Creation | German textbook glosses: card back, editor-only, or dropped? |
+| Q25 | Delivery | App name `Vocab`, bundle id `in.fabricius.vocab`? |

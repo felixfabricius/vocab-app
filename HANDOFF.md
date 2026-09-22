@@ -1,7 +1,7 @@
 # Technical handoff (for a fresh context)
 
 Everything an implementer needs to continue from the 2026-09-21 state without the chat history.
-Product decisions: `SPEC.md` (web phase, still valid) and `SPEC-NATIVE.md` (phase 2 draft with open questions).
+Product decisions: `SPEC.md` (web phase, still valid) and `SPEC-NATIVE.md` (phase 2; §1 lists the decisions taken so far, the end lists what is still open: platform choice, Mac rental, German glosses, app name).
 Code seams: `ARCHITECTURE.md`. Original plan: `PLAN.md`.
 
 ## 1. Repository and toolchain
