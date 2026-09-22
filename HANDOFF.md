@@ -1,7 +1,23 @@
 # Technical handoff (for a fresh context)
 
 Everything an implementer needs to continue from the 2026-09-21 state without the chat history.
-Product decisions: `SPEC.md` (web phase, still valid) and `SPEC-NATIVE.md` (phase 2; §1 lists the decisions taken so far, the end lists what is still open: platform choice, Mac rental, German glosses, app name).
+Product decisions: `SPEC.md` (web phase, still valid) and `SPEC-NATIVE.md` (phase 2, revision 3, all questions answered; §1 is the decision table).
+`PLAN-NATIVE.md` (implementation plan plus the deferred-items tracker) is referenced by the spec but **not written yet**; it is the first task of the next session.
+
+## 0. Phase-2 decisions that shape implementation
+
+- **Platform: Capacitor wrapper** around the existing web app (Capacitor 7, SPM, no CocoaPods). OS features become small Swift plugins behind the seams in `ARCHITECTURE.md`. No SwiftUI rewrite.
+- **App name "¡A la luna!"**, bundle id **`in.fabricius.vocab`**, iCloud container `iCloud.in.fabricius.vocab`, App Group `group.in.fabricius.vocab`. Xcode product name stays ASCII (`ALaLuna`); the display name carries the punctuation. The bundle id is permanent after the first upload.
+- **Minimum iOS 26.** iPhone 14 is the only target device.
+- **CI-led, no Mac.** Builds, signing (`fastlane match` with an App Store Connect API key) and TestFlight uploads run on GitHub Actions macOS runners. Everything is attempted from Windows + CI first. Whatever proves too cumbersome (candidates: adding the widget extension target, debugging entitlements or the audio session) is deferred, the decision documented, and listed in the tracker in `PLAN-NATIVE.md` for a later rented-Mac session.
+- **Web app is frozen** once the native app works; no parallel deployment. Migration is a one-time backup export in the web app and import in the native app.
+- **Shortcuts are removed** once the lock-screen widget, bottom-corner control and home-screen widget deep-link into the in-app translate screen. No Siri intent.
+- **Storage:** iCloud Drive app container with `snapshot.json` plus `changes/*.jsonl` drained from the existing outbox. No Windows access needed.
+- **Grading:** Again / Good only; Easy and the up-swipe are removed. Swipe right = Good.
+- **Study by tag:** one tag per batch stored on every entry; tag study takes due + learning + new (toggle for everything), ignores the session cap and new limit, counts toward "introduced today".
+- **Voice review:** level 1 (screen on, on-device sí / no) now, built as an `InputSource` so level 2 (locked) can follow; silence repeats once, then skips ungraded. Wired EarPods buttons via the remote command centre.
+- **Card creation:** translate lookups (every one becomes a draft) go through a manual "Create cards from lookups" button with automatic Claude enrichment. Claude-app extraction uses prompt builders (series, textbook, book, context) and format `VOCABAPP-IMPORT v2` (batch `tag`, per-item `sentenceSource`); German glosses are translated to English and dropped. All multi-card jobs end in a flat drafts table (front/back rows, swipe to remove, tap to edit).
+- **Order of work** is `SPEC-NATIVE.md` §8: wrapper + CI + TestFlight first, with the app unchanged.
 Code seams: `ARCHITECTURE.md`. Original plan: `PLAN.md`.
 
 ## 1. Repository and toolchain
@@ -113,6 +129,7 @@ Semantics that matter:
 
 ## 11. Known gaps and small bugs to carry over
 
+- Fixed 2026-09-21 and deployable with `pnpm run deploy`: the schema bug that broke every Claude call, and the English meaning on both sides of conjugation cards.
 - "Easy" grade and up-swipe still exist (to remove).
 - `settings.playback = "handsFree"` is defined but unused.
 - Suggestion editor edits `generatedSentence.es` and clears its span (the highlight disappears after editing a sentence; recomputed only if `target` is re-derived; acceptable).

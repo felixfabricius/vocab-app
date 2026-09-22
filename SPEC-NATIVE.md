@@ -1,7 +1,6 @@
 # Spec: from web app to native iOS app (phase 2)
 
-Status: revision 2, 2026-09-21, with your answers to Q1–Q22 folded in. Items marked **decided** are settled.
-Remaining open questions are numbered **Q1, Q4, Q23–Q25** and collected at the end.
+Status: revision 3, 2026-09-21. All questions answered; no open items remain. Implementation plan: `PLAN-NATIVE.md`.
 `SPEC.md` stays the source of truth for everything this document does not change.
 
 ## 0. Where we are
@@ -15,9 +14,12 @@ Remaining open questions are numbered **Q1, Q4, Q23–Q25** and collected at the
 
 | Topic | Decision |
 |---|---|
+| Platform | **Capacitor wrapper** around the existing web app; OS features as small Swift plugins behind the seams in `ARCHITECTURE.md` |
+| App name / bundle id | **"¡A la luna!"** / **`in.fabricius.vocab`** (iCloud container `iCloud.in.fabricius.vocab`, App Group `group.in.fabricius.vocab`) |
 | Minimum iOS | **26** (your phone's version; unlocks SpeechAnalyzer for long-form on-device recognition and the newest Translation/Controls APIs) |
 | Build pipeline | **GitHub Actions** macOS runners with fastlane; no Xcode Cloud |
-| Cloud Mac | Acceptable if it earns its cost; default is CI. See §2.3 for what it buys under each platform option |
+| Cloud Mac | **CI-led.** Everything is attempted from Windows + CI first. Whatever proves too cumbersome that way is deferred, the decision documented, and listed in the tracker in `PLAN-NATIVE.md` §9 for a later rented-Mac session |
+| German textbook glosses | **Dropped** after translation to English; nothing stored |
 | Translate-log enrichment | **Automatic on import** |
 | Lookups → cards | **Manual trigger** that gathers every lookup since the last run (in-app history; the Shortcuts file while it still exists), drafts, enriches, shows the table |
 | Manual add | **One free field (Spanish or English) + optional other side + optional tag + "Complete with AI"** |
@@ -35,7 +37,9 @@ Remaining open questions are numbered **Q1, Q4, Q23–Q25** and collected at the
 | Web app | **Frozen** once the native app works; no parallel deployment |
 | Order of work | As in §8 |
 
-## 2. Platform: Capacitor wrapper vs SwiftUI rewrite (still open, Q1)
+## 2. Platform: Capacitor wrapper vs SwiftUI rewrite **(decided: wrapper)**
+
+Kept for the record; the comparison is what the decision rests on.
 
 ### 2.1 Does the swipe survive a Capacitor wrapper?
 
@@ -86,23 +90,18 @@ Rental options, all controlled by remote desktop or VNC from Windows; prices are
 | AWS EC2 Mac | about $0.65–1.10 per hour, 24-hour minimum | Enterprise-grade, overkill here |
 | Used Mac mini M1 | €350–450 once | Pays for itself after a few months of rental; also fixes debugging permanently |
 
-### 2.4 Recommendation
+### 2.4 Decision
 
-Wrapper (A). The only feature where native is materially better is voice review level 2, which you have deferred. Should level 2 later prove unreliable in the wrapper, the review loop alone moves into a native plugin; the rest of the app is unaffected.
+Wrapper. The only feature where native is materially better is voice review level 2, which is deferred. Should level 2 later prove unreliable in the wrapper, the review loop alone moves into a native plugin; the rest of the app is unaffected. Mac time is not planned; anything that turns out to need it goes on the deferred tracker.
 
-- **Q1.** Wrapper (A) or SwiftUI rewrite (B), given §2.2–2.3?
-- **Q4.** If A: rent a Mac for one session to add the widget target and run the first signing, or go CI-only with `xcodegen`? If B: the Mac is required; rental or purchase?
+## 3. Build and delivery **(decided: GitHub Actions, CI-led)**
 
-## 3. Build and delivery **(decided: GitHub Actions)**
-
-- App Store Connect record created once in the web UI.
-- **App name** is the label under the icon and in TestFlight; changeable later. **Bundle identifier** is the reverse-DNS id that uniquely identifies the app to Apple, e.g. `in.fabricius.vocab`; it cannot be changed after the first upload without creating a new app. It also seeds the iCloud container (`iCloud.in.fabricius.vocab`) and App Group (`group.in.fabricius.vocab`) names.
+- App Store Connect record created once in the web UI: name **¡A la luna!**, bundle id **`in.fabricius.vocab`**. The Xcode product name stays ASCII (`ALaLuna`); the display name carries the punctuation.
+- The bundle id cannot be changed after the first upload without creating a new app. It seeds the iCloud container (`iCloud.in.fabricius.vocab`) and App Group (`group.in.fabricius.vocab`) names.
 - Signing: `fastlane match` on the runner with an App Store Connect API key creates and stores certificates and profiles in a private repo; nothing is done on a personal machine.
 - Pipeline on push to `main`: `pnpm build` → `cap sync ios` → `xcodebuild archive` → upload to TestFlight (internal tester: you). Free tier ≈ 200 macOS minutes/month, one build ≈ 15 minutes.
-- iOS project: generated once with Capacitor 7 and SPM (no CocoaPods), committed. Extension targets per Q4.
+- iOS project: generated once with Capacitor 7 and SPM (no CocoaPods), committed. Extension targets (widgets) are added from CI with a scripted project edit; if that proves too brittle it is deferred to the tracker.
 - Data migration from the web app: Export backup → Import backup (exists). One-time, manual.
-
-- **Q25.** Confirm app name `Vocab` and bundle id `in.fabricius.vocab`, or choose others.
 
 ## 4. Card creation
 
@@ -116,7 +115,7 @@ Wrapper (A). The only feature where native is materially better is voice review 
 
 Flow: prompt builder → Copy → Claude app (with photo or subtitle text) → copy the reply → paste into the app → drafts table.
 
-**Format:** `VOCABAPP-IMPORT v2`, backwards compatible with v1. Additions: batch-level `tag`, per-item `sentenceSource` (`"source"` | `"generated"`), `glossSource` (original German gloss when the source was German).
+**Format:** `VOCABAPP-IMPORT v2`, backwards compatible with v1. Additions: batch-level `tag`, per-item `sentenceSource` (`"source"` | `"generated"`). German glosses in the source are translated to English by Claude and not stored.
 
 **Claude supplies:** lemma, part of speech, gender + article, English meanings, priority estimate, regional flag, note, one sentence (from the source when the item occurred in it, otherwise generated), phrase flag, verb irregularity.
 
@@ -127,11 +126,9 @@ Flow: prompt builder → Copy → Claude app (with photo or subtitle text) → c
 | Builder | Fields | Behaviour |
 |---|---|---|
 | Series episode | series, season/episode, tag (default: series), target count, phrase preference | Sentences taken from the subtitles; phrases include collocations and recurring slang; very basic words excluded |
-| Textbook page | tag (default: book + page) | Everything on the page; glosses in English; a German gloss is translated to English and kept as `glossSource` |
+| Textbook page | tag (default: book + page) | Everything on the page; glosses in English; a German gloss is translated to English and then dropped |
 | Book page | tag, density (unknown-looking words / all content words / everything) | Density is guidance; the app dedupes |
 | Context | situation text, target count | No source text; items and sentences invented for the situation |
-
-- **Q23.** German textbook glosses: keep the German as a visible secondary line on the card back, editor-only, or drop it after translation? Default if no answer: editor-only.
 
 ### 4c. Drafts table (applies to every multi-card job)
 
@@ -171,11 +168,6 @@ The app writes `snapshot.json` (full export) whenever it goes to the background,
 6. Widgets and control with deep links; remove Shortcuts.
 7. Voice review level 1, EarPods buttons.
 
-## Open questions, remaining
+## Open questions
 
-| # | Topic | Question |
-|---|---|---|
-| Q1 | Platform | Wrapper (A) or SwiftUI rewrite (B)? See §2.2–2.4 |
-| Q4 | Build | If A: one Mac session for the widget target and first signing, or CI-only with xcodegen? If B: rent or buy? |
-| Q23 | Creation | German textbook glosses: card back, editor-only, or dropped? |
-| Q25 | Delivery | App name `Vocab`, bundle id `in.fabricius.vocab`? |
+None. New ones that arise during implementation go into `PLAN-NATIVE.md` §9 (deferred items and decisions log).
