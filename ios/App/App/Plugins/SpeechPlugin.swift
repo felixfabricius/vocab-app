@@ -12,7 +12,7 @@ public class SpeechPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "Speech"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "available", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "authorize", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
     ]
@@ -37,7 +37,7 @@ public class SpeechPlugin: CAPPlugin, CAPBridgedPlugin {
         ])
     }
 
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    @objc func authorize(_ call: CAPPluginCall) {
         SFSpeechRecognizer.requestAuthorization { status in
             AVAudioApplication.requestRecordPermission { granted in
                 call.resolve(["speech": status == .authorized, "microphone": granted])

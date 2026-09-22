@@ -18,7 +18,7 @@ export type SpeechEndReason = "final" | "silence" | "timeout" | "stopped" | "err
 
 interface SpeechPlugin {
   available(o: { locale: string }): Promise<{ available: boolean; onDevice: boolean; authorized: boolean }>;
-  requestPermissions(): Promise<{ speech: boolean; microphone: boolean }>;
+  authorize(): Promise<{ speech: boolean; microphone: boolean }>;
   start(o: SpeechStartOptions): Promise<void>;
   stop(): Promise<{ text: string }>;
   addListener(event: "partial", fn: (e: { text: string; isFinal: boolean }) => void): Promise<PluginListenerHandle>;
@@ -37,7 +37,7 @@ export async function speechAvailable(locale: string) {
 
 export async function speechRequestPermissions() {
   try {
-    return await Speech.requestPermissions();
+    return await Speech.authorize();
   } catch (e) {
     throw toNativeError(e);
   }
