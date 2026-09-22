@@ -8,6 +8,8 @@ import { parsePasteImport, parseTsvLines } from "@/core/import/paste";
 import { draftsFromTranslateLog, latestTimestamp, parseTranslateLog, rowsAfter } from "@/core/import/translateLog";
 import type { ImportBatch } from "@/core/types";
 import { enrichEntryIds } from "@/features/entries/enrichService";
+import { runJob, useJob } from "@/app/jobs";
+import { JobBar } from "./DraftsTable";
 import { prepareImage } from "@/llm/image";
 import { draftFromImage, draftFromText, draftManual, scanText, SCAN_THRESHOLD_WORDS } from "@/llm/pipelines";
 import type { EntryDraft } from "@/core/types";
@@ -26,6 +28,7 @@ export function ImportScreen() {
   const [text, setText] = useState("");
   const [word, setWord] = useState("");
   const [pageRef, setPageRef] = useState("");
+  const [tag, setTag] = useState("");
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [bareCount, setBareCount] = useState(0);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -33,18 +36,26 @@ export function ImportScreen() {
   const logInput = useRef<HTMLInputElement>(null);
 
   const hasKey = !!settings?.anthropicKey;
+  const job = useJob();
+  const tagOpt = tag.trim() ? { tag: tag.trim() } : {};
 
   async function refreshBatches() {
     setBatches(await repo.listBatches());
     setBareCount((await repo.entryIdsWithoutSentences()).length);
   }
 
-  async function onEnrichAll() {
-    await run("Enrich", async () => {
-      const ids = await repo.entryIdsWithoutSentences();
-      const ctx = await draftContext();
-      const r = await enrichEntryIds(repo, llmEnv, ctx, ids.slice(0, 60));
-      return { ...(r.childBatchId ? { batchId: r.childBatchId } : {}), message: `${r.enriched} entries enriched, ${r.sentencesAdded} sentences added ($${r.usd.toFixed(3)})` };
+  function onEnrichAll() {
+    const handle = runJob({
+      label: "Enriching with Claude",
+      task: async (signal, progress) => {
+        const ids = (await repo.entryIdsWithoutSentences()).slice(0, 60);
+        return enrichEntryIds(repo, llmEnv, await draftContext(), ids, { signal, onProgress: progress });
+      },
+      summary: (r) => `${r.enriched} entries enriched, ${r.sentencesAdded} sentences added ($${r.usd.toFixed(3)})`,
+    });
+    void handle.result.then(async (r) => {
+      await refreshBatches();
+      if (r?.childBatchId) nav(`/import/batch/${r.childBatchId}`);
     });
   }
   useEffect(() => {
@@ -76,6 +87,7 @@ export function ImportScreen() {
         sourceType: "photo",
         label: `Photo ${new Date().toLocaleString()}`,
         ...(pageRef ? { pageRef } : {}),
+        ...tagOpt,
         imageHash: img.hash,
         drafts: out.drafts.map((d) => (pageRef && !d.pageRef ? { ...d, pageRef } : d)),
         frequency: await loadFrequency(),
@@ -95,6 +107,7 @@ export function ImportScreen() {
         sourceType: "paste",
         label: `Paste ${new Date().toLocaleString()}`,
         ...(pageRef ? { pageRef } : {}),
+        ...tagOpt,
         drafts: parsed.items,
         frequency: await loadFrequency(),
       });
@@ -122,13 +135,13 @@ export function ImportScreen() {
           fromSentence: [],
           ...(scan.lines[c.lineIndex] ? { sourceSentence: { es: scan.lines[c.lineIndex]!, en: "" } } : {}),
         }));
-        const batch = await createBatch(repo, { sourceType: "text", label: `Scan ${new Date().toLocaleString()}`, drafts, frequency: await loadFrequency() });
+        const batch = await createBatch(repo, { sourceType: "text", label: `Scan ${new Date().toLocaleString()}`, ...tagOpt, drafts, frequency: await loadFrequency() });
         setText("");
         return { batchId: batch.id, message: `${drafts.length} candidates for $${scan.usd.toFixed(3)}. Accept the ones you want, then enrich.` };
       }
       const out = await draftFromText(llmEnv, ctx, text);
       if (out.drafts.length === 0) return { message: "No vocabulary found." };
-      const batch = await createBatch(repo, { sourceType: "text", label: `Text ${new Date().toLocaleString()}`, drafts: out.drafts, frequency: await loadFrequency() });
+      const batch = await createBatch(repo, { sourceType: "text", label: `Text ${new Date().toLocaleString()}`, ...tagOpt, drafts: out.drafts, frequency: await loadFrequency() });
       setText("");
       return { batchId: batch.id, message: `${out.drafts.length} items drafted for $${out.usd.toFixed(3)}` };
     });
@@ -154,7 +167,7 @@ export function ImportScreen() {
       const ctx = await draftContext();
       const out = await draftManual(llmEnv, ctx, word.trim());
       if (out.drafts.length === 0) return { message: "Nothing drafted." };
-      const batch = await createBatch(repo, { sourceType: "manual", label: word.trim(), drafts: out.drafts, frequency: await loadFrequency() });
+      const batch = await createBatch(repo, { sourceType: "manual", label: word.trim(), ...tagOpt, drafts: out.drafts, frequency: await loadFrequency() });
       setWord("");
       return { batchId: batch.id, message: `Drafted for $${out.usd.toFixed(3)}` };
     });
@@ -183,6 +196,7 @@ export function ImportScreen() {
   return (
     <Screen title="Import">
       {msg && <div className="mb-3 whitespace-pre-wrap rounded-xl bg-surface-2 p-3 text-sm">{msg}</div>}
+      {job && <JobBar job={job} />}
       {busy && (
         <div className="mb-3 flex items-center gap-2 rounded-xl bg-accent/10 p-3 text-sm text-accent">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" />
@@ -202,10 +216,20 @@ export function ImportScreen() {
               <div className="font-medium">{bareCount} entries without sentences</div>
               <div className="text-muted">Add examples, gender, notes with Claude (max 60 per run).</div>
             </div>
-            <Button disabled={!!busy} onClick={() => void onEnrichAll()}>Enrich</Button>
+            <Button disabled={!!busy || job?.status === "running"} onClick={onEnrichAll}>Enrich</Button>
           </div>
         </Card>
       )}
+
+      <Card className="mb-4">
+        <label className="mb-1 block text-xs text-muted">Tag for the next import (optional; stored on every entry of the batch)</label>
+        <input
+          className="w-full rounded-xl bg-surface-2 px-3 py-2 text-sm"
+          placeholder="e.g. Aula 1 p. 23 or Casa de Papel S1E1"
+          value={tag}
+          onChange={(e) => setTag(e.target.value)}
+        />
+      </Card>
 
       {open.length > 0 && (
         <Card className="mb-4">
@@ -215,7 +239,7 @@ export function ImportScreen() {
               <li key={b.id}>
                 <button className="flex w-full items-center justify-between py-2 text-left" onClick={() => nav(`/import/batch/${b.id}`)}>
                   <span className="text-sm">
-                    {b.counts.new} new · {b.counts.known} known
+                    {b.counts.new} new · {b.counts.known} known{b.tag ? ` · ${b.tag}` : ""}
                   </span>
                   <span className="text-xs text-muted">{new Date(b.createdAt).toLocaleString()}</span>
                 </button>

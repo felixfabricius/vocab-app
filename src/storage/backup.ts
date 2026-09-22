@@ -1,6 +1,7 @@
 import type { Repository } from "./Repository";
 
-export const BACKUP_VERSION = 1;
+/** 1 = web phase; 2 adds the `lookups` table (older files import fine: missing tables are skipped). */
+export const BACKUP_VERSION = 2;
 
 export interface BackupFile {
   app: "vocab";

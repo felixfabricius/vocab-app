@@ -28,11 +28,23 @@ body {
     -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
 
-/* Safe-area aware full-height layout for the installed app */
+/* Safe-area aware full-height layout. The shell never scrolls; each screen scrolls inside it,
+   so the native web view can keep its own scrolling (and rubber-banding) switched off. */
 .app-shell {
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+.screen-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .no-select {

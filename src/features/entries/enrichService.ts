@@ -22,11 +22,18 @@ export interface EnrichResult {
   usd: number;
 }
 
-export async function enrichEntryIds(repo: Repository, env: LlmEnv, ctx: DraftContext, entryIds: string[]): Promise<EnrichResult> {
+export interface JobOptions {
+  signal?: AbortSignal;
+  onProgress?: (done: number, total: number) => void;
+}
+
+export async function enrichEntryIds(repo: Repository, env: LlmEnv, ctx: DraftContext, entryIds: string[], job: JobOptions = {}): Promise<EnrichResult> {
   const result: EnrichResult = { enriched: 0, sentencesAdded: 0, usd: 0 };
   const children: EntryDraft[] = [];
+  job.onProgress?.(0, entryIds.length);
 
   for (let i = 0; i < entryIds.length; i += CHUNK) {
+    if (job.signal?.aborted) break;
     const ids = entryIds.slice(i, i + CHUNK);
     const bundles = (await Promise.all(ids.map((id) => repo.getBundle(id)))).filter((b): b is NonNullable<typeof b> => !!b);
     if (bundles.length === 0) continue;
@@ -49,6 +56,7 @@ export async function enrichEntryIds(repo: Repository, env: LlmEnv, ctx: DraftCo
       if (!draft) continue;
       await applyDraft(repo, b.entry, b.senses, b.sentences.length, draft, result, children);
     }
+    job.onProgress?.(Math.min(i + CHUNK, entryIds.length), entryIds.length);
   }
 
   if (children.length > 0) {

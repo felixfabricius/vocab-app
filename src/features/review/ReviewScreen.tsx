@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { Button, Spinner } from "@/app/components/ui";
 import { getAudio, repo, schedulerFor } from "@/app/services";
 import { newId } from "@/core/ids";
-import { buildSession } from "@/core/scheduler/session";
+import { buildSession, buildTagSession } from "@/core/scheduler/session";
 import { dayEnd } from "@/core/scheduler/day";
 import * as rs from "@/core/review/session";
 import type { Entry, GradeName, Settings } from "@/core/types";
@@ -16,6 +16,10 @@ type Phase = "loading" | "reviewing" | "done";
 
 export function ReviewScreen() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  // /review?tag=<tag>&all=1 studies one tag (due → learning → new, no caps); plain /review is today's session.
+  const tag = params.get("tag") ?? undefined;
+  const includeAll = params.get("all") === "1";
   const [phase, setPhase] = useState<Phase>("loading");
   const [settings, setSettings] = useState<Settings | undefined>();
   const [entries, setEntries] = useState<Map<string, Entry>>(new Map());
@@ -43,7 +47,9 @@ export function ReviewScreen() {
     let alive = true;
     (async () => {
       const [s, cards, ents] = await Promise.all([repo.getSettings(), repo.allCards(), repo.allActiveEntriesById()]);
-      const session = buildSession({ cards, entriesById: ents, settings: s, now: new Date() });
+      const session = tag
+        ? buildTagSession({ cards, entriesById: ents, settings: s, now: new Date(), tag, includeAll })
+        : buildSession({ cards, entriesById: ents, settings: s, now: new Date() });
       if (!alive) return;
       setSettings(s);
       setEntries(ents);
@@ -66,7 +72,7 @@ export function ReviewScreen() {
       alive = false;
       audio.cancel();
     };
-  }, [audio]);
+  }, [audio, tag, includeAll]);
 
   // Load content for the current card
   const current = state?.current;
@@ -179,9 +185,7 @@ export function ReviewScreen() {
 
   const onSwipe = useCallback(
     (dir: SwipeDir) => {
-      if (dir === "right") doGrade("good");
-      else if (dir === "left") doGrade("again");
-      else doGrade("easy");
+      doGrade(dir === "right" ? "good" : "again");
     },
     [doGrade],
   );
@@ -192,7 +196,7 @@ export function ReviewScreen() {
 
   if (phase === "done") {
     return (
-      <div className="mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-6 p-6 text-center">
+      <div className="mx-auto flex flex-1 max-w-md flex-col items-center justify-center gap-6 p-6 text-center">
         <div className="text-3xl font-semibold">Done for now</div>
         <div className="text-muted">{state.graded} cards reviewed</div>
         <div className="flex gap-3">
@@ -205,19 +209,22 @@ export function ReviewScreen() {
     );
   }
 
-  const { dx, dy, dragging } = swipe.state;
+  const { dx, dragging } = swipe.state;
   const tilt = Math.max(-12, Math.min(12, dx / 12));
-  const hint = state.flipped ? (dx > 40 ? "good" : dx < -40 ? "again" : dy < -40 ? "easy" : undefined) : undefined;
-  const hintColor = hint === "good" ? "border-good" : hint === "again" ? "border-again" : hint === "easy" ? "border-easy" : "border-transparent";
+  const hint = state.flipped ? (dx > 40 ? "good" : dx < -40 ? "again" : undefined) : undefined;
+  const hintColor = hint === "good" ? "border-good" : hint === "again" ? "border-again" : "border-transparent";
   const speak = (t: string) => void audio.speak(t, { rate: settings.speechRate });
 
   return (
-    <div className="no-select mx-auto flex min-h-full max-w-md flex-col px-4 pb-4 pt-2">
+    <div className="no-select mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pb-4 pt-2">
       <header className="flex items-center justify-between py-2 text-sm text-muted">
         <button className="px-2 py-1" onClick={() => nav("/")}>
           ✕ Close
         </button>
-        <span>{rs.remaining(state)} left</span>
+        <span>
+          {tag && <span className="mr-2 rounded-full bg-surface-2 px-2 py-0.5 text-xs text-accent">{tag}</span>}
+          {rs.remaining(state)} left
+        </span>
         <div className="flex gap-1">
           <button className="px-2 py-1 disabled:opacity-30" disabled={state.history.length === 0} onClick={doUndo}>
             ↶ Undo
@@ -227,7 +234,7 @@ export function ReviewScreen() {
 
       <div
         className={`relative flex flex-1 touch-none flex-col rounded-3xl border-4 bg-surface p-6 shadow-xl transition-transform ${hintColor} ${dragging ? "" : "duration-200"}`}
-        style={{ transform: `translate(${dx}px, ${dy}px) rotate(${tilt}deg)` }}
+        style={{ transform: `translateX(${dx}px) rotate(${tilt}deg)` }}
         {...swipe.handlers}
       >
         {!content ? (
@@ -245,9 +252,6 @@ export function ReviewScreen() {
           <>
             <Button className="flex-1 bg-again/20 text-again" onClick={() => doGrade("again")}>
               Again
-            </Button>
-            <Button className="flex-1 bg-easy/20 text-easy" onClick={() => doGrade("easy")}>
-              Easy
             </Button>
             <Button className="flex-1 bg-good/20 text-good" onClick={() => doGrade("good")}>
               Good

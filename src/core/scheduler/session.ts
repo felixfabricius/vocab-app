@@ -120,3 +120,56 @@ export function buildSession(input: SessionInput): Session {
 
   return { due: dueCapped, learning, fresh: picked, introducedToday };
 }
+
+export interface TagSessionInput {
+  cards: Card[];
+  entriesById: Map<string, Entry>;
+  settings: Settings;
+  now: Date;
+  tag: string;
+  /** also include review cards that are not due yet */
+  includeAll?: boolean;
+}
+
+/**
+ * Study by tag: every active card whose entry carries the tag, due → learning →
+ * new. No session cap, no daily new limit; `includeAll` adds review cards that
+ * are not due yet. Grades go through the same state machine, so new cards
+ * graded here still count toward "introduced today".
+ */
+export function buildTagSession(input: TagSessionInput): Session {
+  const { cards, entriesById, settings, now, tag } = input;
+  const endOfDay = dayEnd(now, settings.dayRolloverHour).getTime();
+  const today = dayKey(now, settings.dayRolloverHour);
+
+  const due: Card[] = [];
+  const learning: Card[] = [];
+  const fresh: Card[] = [];
+  let introducedToday = 0;
+
+  for (const c of cards) {
+    const entry = entriesById.get(c.entryId);
+    if (!entry || entry.status !== "active" || !entry.tags.includes(tag)) continue;
+    if (c.status === "suspended") continue;
+    if (c.status === "buried" && c.buriedUntil && new Date(c.buriedUntil).getTime() > now.getTime()) continue;
+    const st = c.fsrs.state;
+    if (st === STATE_NEW) {
+      fresh.push(c);
+      continue;
+    }
+    if (c.introducedOn === today) introducedToday++;
+    if (st === STATE_LEARNING || st === STATE_RELEARNING) learning.push(c);
+    else if (input.includeAll || new Date(c.fsrs.due).getTime() < endOfDay) due.push(c);
+  }
+
+  const byDue = (a: Card, b: Card) => new Date(a.fsrs.due).getTime() - new Date(b.fsrs.due).getTime();
+  due.sort(byDue);
+  learning.sort(byDue);
+  fresh.sort((a, b) => {
+    const ra = entriesById.get(a.entryId)?.frequencyRank ?? Number.POSITIVE_INFINITY;
+    const rb = entriesById.get(b.entryId)?.frequencyRank ?? Number.POSITIVE_INFINITY;
+    if (ra !== rb) return ra - rb;
+    return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
+  });
+  return { due, learning, fresh, introducedToday };
+}

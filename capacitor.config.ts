@@ -10,8 +10,8 @@ const config: CapacitorConfig = {
     contentInset: "never",
     allowsLinkPreview: false,
     backgroundColor: "#0f172a",
-    // Stays true in M1 (app unchanged); M2 moves scrolling into the Screen container and sets this to false.
-    scrollEnabled: true,
+    // Screens scroll inside `.screen-scroll`; the web view itself must not (no rubber-banding under the swipe card).
+    scrollEnabled: false,
   },
   plugins: { Keyboard: { resize: "native" } },
   // `cap sync` derives `.iOS(.v26)` from the deployment target; the default tools version 5.9 does not know it.

@@ -3,6 +3,23 @@ import { gradeState, makeScheduler, newFsrsState, rollbackState, retrievability 
 
 const now = new Date("2026-09-18T10:00:00Z");
 
+/** Grade Good until the card leaves the learning steps (Again/Good only, so this is how cards reach review). */
+function graduate(sch: ReturnType<typeof makeScheduler>) {
+  let state = newFsrsState(now);
+  let next = now;
+  let at = now;
+  let log = gradeState(sch, state, "good", at).log;
+  for (let i = 0; i < 10 && state.state !== 2; i++) {
+    at = next;
+    const r = gradeState(sch, state, "good", at);
+    state = r.state;
+    log = r.log;
+    next = new Date(state.due);
+  }
+  /** `at` is when the last (graduating) grade was given */
+  return { state, log, at };
+}
+
 describe("fsrs wrapper", () => {
   it("creates a new card due now", () => {
     const s = newFsrsState(now);
@@ -22,25 +39,25 @@ describe("fsrs wrapper", () => {
     expect(r.log.rating).toBe(3);
   });
 
-  it("Easy on a new card schedules days ahead", () => {
+  it("Good through the learning steps graduates to review with days ahead", () => {
     const sch = makeScheduler({ requestRetention: 0.9, enableFuzz: false });
-    const r = gradeState(sch, newFsrsState(now), "easy", now);
-    const days = (new Date(r.state.due).getTime() - now.getTime()) / 86_400_000;
-    expect(days).toBeGreaterThan(1);
+    const r = graduate(sch);
+    const days = (new Date(r.state.due).getTime() - r.at.getTime()) / 86_400_000;
+    expect(days).toBeGreaterThanOrEqual(1);
     expect(r.state.state).toBe(2);
   });
 
   it("higher retention target gives shorter intervals", () => {
     const lo = makeScheduler({ requestRetention: 0.85, enableFuzz: false });
     const hi = makeScheduler({ requestRetention: 0.95, enableFuzz: false });
-    const a = gradeState(lo, newFsrsState(now), "easy", now);
-    const b = gradeState(hi, newFsrsState(now), "easy", now);
+    const a = graduate(lo);
+    const b = graduate(hi);
     expect(a.state.scheduledDays).toBeGreaterThan(b.state.scheduledDays);
   });
 
   it("Again after a review increments lapses and rollback restores", () => {
     const sch = makeScheduler({ requestRetention: 0.9, enableFuzz: false });
-    const first = gradeState(sch, newFsrsState(now), "easy", now);
+    const first = graduate(sch);
     const later = new Date(first.state.due);
     const second = gradeState(sch, first.state, "again", later);
     expect(second.state.lapses).toBe(1);
@@ -51,9 +68,9 @@ describe("fsrs wrapper", () => {
 
   it("retrievability decays over time", () => {
     const sch = makeScheduler({ requestRetention: 0.9, enableFuzz: false });
-    const r = gradeState(sch, newFsrsState(now), "easy", now);
-    const soon = retrievability(sch, r.state, new Date(now.getTime() + 3600_000));
-    const late = retrievability(sch, r.state, new Date(now.getTime() + 30 * 86_400_000));
+    const r = graduate(sch);
+    const soon = retrievability(sch, r.state, new Date(r.at.getTime() + 3600_000));
+    const late = retrievability(sch, r.state, new Date(r.at.getTime() + 30 * 86_400_000));
     expect(soon).toBeGreaterThan(late);
   });
 });

@@ -11,6 +11,7 @@ import type {
   Entry,
   IgnoreEntry,
   ImportBatch,
+  Lookup,
   OutboxRow,
   ReviewLog,
   Sense,
@@ -34,6 +35,7 @@ export class VocabDB extends Dexie {
   ignoreList!: Table<IgnoreEntry, string>;
   tensePlan!: Table<TensePlanRow, string>;
   settings!: Table<Settings, string>;
+  lookups!: Table<Lookup, string>;
   outbox!: Table<OutboxRow, number>;
 
   constructor(name = "vocab") {
@@ -53,6 +55,11 @@ export class VocabDB extends Dexie {
       settings: "id",
       outbox: "++seq, table, at",
     });
+    // Phase 2: tag index for "study by tag"; translate lookups history (consumed by "Create cards from lookups").
+    this.version(2).stores({
+      entries: "id, [lemma+pos], lemma, priority, status, updatedAt, *tags",
+      lookups: "id, at, consumedAt",
+    });
     this.use(outboxMiddleware);
   }
 }
@@ -70,6 +77,7 @@ const TRACKED = new Set([
   "ignoreList",
   "tensePlan",
   "settings",
+  "lookups",
 ]);
 
 const outboxMiddleware: Middleware<DBCore> = {

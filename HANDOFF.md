@@ -86,8 +86,8 @@ Semantics that matter:
 - One `fsrs()` instance per priority class, keyed by retention target (0.95/0.92/0.90/0.85) and optional weights; short-term learning steps enabled (new card Good → back in ~10 min within the session).
 - `buildSession`: due = review-state cards due before the next rollover, sorted by class then overdue ratio, capped at `sessionCap` (lowest class dropped first); learning = learning/relearning cards due within 20 min; fresh = new cards by class quota (60/25/12/3 %) minus `introducedToday`, ordered by frequency rank.
 - `core/review/session.ts` is pure: every action returns `{state, effects}`; effects are `upsertCards`, `addLogs`, `deleteLogIds`. Leech: lapses ≥ per-class threshold on an Again → suspended + flagged. Undo uses `rollback` with the stored log. History depth 10.
-- ReviewScreen: tap flips, swipe right Good / left Again / up Easy (**Easy is to be removed**), buttons duplicate the swipes, audio on flip speaks lemma then sentence (paradigm: the six forms), any grade cancels speech. Content per card is loaded through `repo.getBundle` and cached per card id.
-- `study by tag` does not exist yet; the natural implementation is a second `buildSession` variant filtered by `entry.tags` with limits disabled, feeding the same review state machine.
+- ReviewScreen: tap flips, swipe right Good / left Again (Easy removed in M2), buttons duplicate the swipes, audio on flip speaks lemma then sentence (paradigm: the six forms), any grade cancels speech. Content per card is loaded through `repo.getBundle` and cached per card id.
+- Study by tag: `buildTagSession` in `core/scheduler/session.ts`, route `/review?tag=<t>&all=1`, picker on Today.
 
 ## 6. Card creation pipeline
 
@@ -129,13 +129,13 @@ Semantics that matter:
 
 ## 11. Known gaps and small bugs to carry over
 
-- Fixed 2026-09-21 and deployable with `pnpm run deploy`: the schema bug that broke every Claude call, and the English meaning on both sides of conjugation cards.
-- "Easy" grade and up-swipe still exist (to remove).
-- `settings.playback = "handsFree"` is defined but unused.
+- Native phase progress (2026-09-22): M1 (wrapper, CI, TestFlight) built and uploaded; its phone checklist is still to be ticked. M2 (Again/Good only, scroll containment with `scrollEnabled: false`, tags with Dexie v2, study by tag, flat drafts table with swipe-to-remove, jobs with progress + cancel) is implemented; M3 is next.
+- Fixed 2026-09-21: the schema bug that broke every Claude call, and the English meaning on both sides of conjugation cards.
+- `settings.playback = "handsFree"` is defined but unused (M7).
 - Suggestion editor edits `generatedSentence.es` and clears its span (the highlight disappears after editing a sentence; recomputed only if `target` is re-derived; acceptable).
 - Import screen's Claude-app prompt is generic (`sourceHint` = textbook page); the requested prompt builders (series, textbook, book, context) do not exist yet.
 - Translate-log enrichment is manual (Enrich button in Import / after accept in the batch screen).
-- No tag UI anywhere; `Entry.tags` is only set by the seed.
+- Tags: batch tag on import, editable on the entry, filter chips on Words, study-by-tag on Today (since M2).
 - Stats screen is minimal (14-day bar chart, retention, counts).
 - Diagnostics page is reachable from Settings; it is the place to verify voices/camera/storage on a new build.
 - `build-seed.ts` has never been executed; the seed is hand-authored.

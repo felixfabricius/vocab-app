@@ -205,6 +205,15 @@ export function EntryScreen() {
         </div>
         <label className="mb-1 mt-3 block text-xs text-muted">Note</label>
         <textarea className={`${field} h-16`} defaultValue={entry.note ?? ""} onBlur={(e) => void patch({ note: e.target.value.trim() || undefined })} />
+        <label className="mb-1 mt-3 block text-xs text-muted">Tags (comma-separated)</label>
+        <input
+          className={field}
+          defaultValue={entry.tags.join(", ")}
+          onBlur={(e) => {
+            const tags = [...new Set(e.target.value.split(",").map((t) => t.trim()).filter(Boolean))];
+            if (tags.join("\n") !== entry.tags.join("\n")) void patch({ tags });
+          }}
+        />
       </Card>
 
       <Card className="mb-4">

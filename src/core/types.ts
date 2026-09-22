@@ -128,12 +128,13 @@ export interface Card {
 }
 
 export type ReviewMode = "tap" | "typed" | "audio" | "voice";
-export type GradeName = "again" | "good" | "easy";
+/** Binary self-grading. Easy was removed in phase 2; old logs may still carry rating 4. */
+export type GradeName = "again" | "good";
 
 export interface ReviewLog {
   id: string;
   cardId: string;
-  /** ts-fsrs Rating: 1 Again, 3 Good, 4 Easy */
+  /** ts-fsrs Rating: 1 Again, 3 Good (4 Easy only in logs from the web phase) */
   rating: 1 | 3 | 4;
   mode: ReviewMode;
   reviewedAt: string;
@@ -152,7 +153,21 @@ export interface ReviewLog {
   };
 }
 
-export type SourceType = "photo" | "paste" | "text" | "srt" | "translate" | "manual" | "seed";
+export type SourceType = "photo" | "paste" | "text" | "srt" | "translate" | "lookups" | "manual" | "seed";
+
+/** One translate lookup (in-app or from the Shortcuts log); becomes a draft on the next "Create cards from lookups". */
+export interface Lookup {
+  id: string;
+  at: string;
+  dir: "en-es" | "es-en";
+  src: string;
+  dst: string;
+  provider: "apple" | "claude" | "shortcuts";
+  /** Claude's suggested flashcard entry, when the lookup went through Claude */
+  draft?: EntryDraft;
+  consumedAt?: string;
+  batchId?: string;
+}
 
 export interface Source {
   id: string;
@@ -166,6 +181,8 @@ export interface Source {
 export interface ImportBatch {
   id: string;
   sourceId: string;
+  /** one tag per batch, written on every entry the batch creates or touches */
+  tag?: string;
   stage: "scanned" | "drafted" | "done";
   counts: { found: number; known: number; new: number };
   createdAt: string;

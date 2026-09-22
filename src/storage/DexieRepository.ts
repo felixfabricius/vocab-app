@@ -6,6 +6,7 @@ import {
   type Entry,
   type IgnoreEntry,
   type ImportBatch,
+  type Lookup,
   type ReviewLog,
   type Sense,
   type Sentence,
@@ -30,6 +31,7 @@ const EXPORT_TABLES = [
   "ignoreList",
   "tensePlan",
   "settings",
+  "lookups",
 ] as const;
 
 type ExportTable = (typeof EXPORT_TABLES)[number];
@@ -61,10 +63,16 @@ export class DexieRepository implements Repository {
     return this.db.entries.where("[lemma+pos]").equals([lemma, pos]).first();
   }
 
-  async listEntries(filter: { status?: Entry["status"]; search?: string; limit?: number } = {}) {
-    let coll = filter.status
-      ? this.db.entries.where("status").equals(filter.status)
-      : this.db.entries.toCollection();
+  async listEntries(filter: { status?: Entry["status"]; search?: string; tag?: string; limit?: number } = {}) {
+    let coll = filter.tag
+      ? this.db.entries.where("tags").equals(filter.tag)
+      : filter.status
+        ? this.db.entries.where("status").equals(filter.status)
+        : this.db.entries.toCollection();
+    if (filter.tag && filter.status) {
+      const status = filter.status;
+      coll = coll.filter((e) => e.status === status);
+    }
     if (filter.search) {
       const q = filter.search.toLowerCase();
       coll = coll.filter((e) => e.lemma.toLowerCase().includes(q));
@@ -77,6 +85,28 @@ export class DexieRepository implements Repository {
   async allActiveEntriesById() {
     const rows = await this.db.entries.where("status").equals("active").toArray();
     return new Map(rows.map((e) => [e.id, e]));
+  }
+
+  async allTags() {
+    const rows = await this.db.entries.where("status").equals("active").toArray();
+    const counts = new Map<string, number>();
+    for (const e of rows) for (const t of e.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+    return [...counts.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+  }
+
+  putLookups(rows: Lookup[]) {
+    return this.db.lookups.bulkPut(rows).then(() => undefined);
+  }
+  async listLookups(filter: { unconsumed?: boolean; limit?: number } = {}) {
+    let rows = await this.db.lookups.orderBy("at").reverse().toArray();
+    if (filter.unconsumed) rows = rows.filter((r) => !r.consumedAt);
+    return filter.limit ? rows.slice(0, filter.limit) : rows;
+  }
+  countUnconsumedLookups() {
+    return this.db.lookups.filter((r) => !r.consumedAt).count();
+  }
+  async markLookupsConsumed(ids: string[], batchId: string, at: string) {
+    await this.db.lookups.where("id").anyOf(ids).modify({ consumedAt: at, batchId });
   }
 
   async getBundle(entryId: string): Promise<EntryBundle | undefined> {

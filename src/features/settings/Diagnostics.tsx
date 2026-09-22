@@ -86,6 +86,7 @@ export function Diagnostics() {
   }
 
   return (
+    <div className="screen-scroll">
     <div className="mx-auto max-w-md space-y-6 p-4">
       <h1 className="text-2xl font-semibold">Diagnostics</h1>
 
@@ -163,6 +164,7 @@ export function Diagnostics() {
           {log.slice(-100).join("\n")}
         </pre>
       </section>
+    </div>
     </div>
   );
 }

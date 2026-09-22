@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSession } from "./session";
+import { buildSession, buildTagSession } from "./session";
 import { newFsrsState } from "./fsrs";
 import { DEFAULT_SETTINGS, type Card, type Entry, type Priority } from "@/core/types";
 
@@ -144,5 +144,36 @@ describe("buildSession", () => {
     ];
     const s = buildSession({ cards, entriesById: entries, settings: DEFAULT_SETTINGS, now });
     expect(s.fresh.map((c) => c.id).sort()).toEqual(["ok", "unburied"]);
+  });
+});
+
+describe("buildTagSession", () => {
+  const entries = new Map([
+    ["a", { ...entry("a", "core", 900), tags: ["s1e1"] }],
+    ["b", { ...entry("b", "core", 100), tags: ["s1e1"] }],
+    ["c", { ...entry("c", "niche"), tags: ["other"] }],
+  ]);
+  const future = new Date(now.getTime() + 3 * 86_400_000).toISOString();
+  const past = new Date(now.getTime() - 86_400_000).toISOString();
+  const cards = [
+    card("new-a", "a"),
+    card("new-b", "b"),
+    card("due-a", "a", { state: 2, due: past, scheduledDays: 2 }),
+    card("later-a", "a", { state: 2, due: future, scheduledDays: 10 }),
+    card("learn-b", "b", { state: 1, due: new Date(now.getTime() + 3600_000).toISOString() }),
+    card("new-c", "c"),
+    card("susp-b", "b", {}, { status: "suspended" }),
+  ];
+
+  it("takes due, learning and new cards of the tag, ignoring caps and limits", () => {
+    const s = buildTagSession({ cards, entriesById: entries, settings: { ...DEFAULT_SETTINGS, dailyNewLimit: 0, sessionCap: 0 }, now, tag: "s1e1" });
+    expect(s.due.map((c) => c.id)).toEqual(["due-a"]);
+    expect(s.learning.map((c) => c.id)).toEqual(["learn-b"]);
+    expect(s.fresh.map((c) => c.id)).toEqual(["new-b", "new-a"]); // by frequency rank
+  });
+
+  it("includeAll adds review cards that are not due yet", () => {
+    const s = buildTagSession({ cards, entriesById: entries, settings: DEFAULT_SETTINGS, now, tag: "s1e1", includeAll: true });
+    expect(s.due.map((c) => c.id)).toEqual(["due-a", "later-a"]);
   });
 });

@@ -1,6 +1,6 @@
 /**
  * Thin wrapper over ts-fsrs. Converts between our stored FsrsState (camelCase,
- * ISO strings) and the library's Card (snake_case, Date), and maps our three
+ * ISO strings) and the library's Card (snake_case, Date), and maps our two
  * grades onto the library's ratings.
  */
 import {
@@ -16,10 +16,9 @@ import {
 } from "ts-fsrs";
 import type { FsrsState, GradeName, ReviewLog } from "@/core/types";
 
-export const GRADE_TO_RATING: Record<GradeName, 1 | 3 | 4> = {
+export const GRADE_TO_RATING: Record<GradeName, 1 | 3> = {
   again: Rating.Again as 1,
   good: Rating.Good as 3,
-  easy: Rating.Easy as 4,
 };
 
 export interface SchedulerOptions {

@@ -11,14 +11,20 @@ export function EntriesScreen() {
   const [rows, setRows] = useState<Entry[] | undefined>();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("active");
+  const [tag, setTag] = useState<string | undefined>();
+  const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
+
+  useEffect(() => {
+    void repo.allTags().then(setTags);
+  }, []);
 
   useEffect(() => {
     let alive = true;
-    repo.listEntries({ status: filter, search, limit: 300 }).then((r) => alive && setRows(r));
+    repo.listEntries({ status: filter, search, ...(tag ? { tag } : {}), limit: 300 }).then((r) => alive && setRows(r));
     return () => {
       alive = false;
     };
-  }, [search, filter]);
+  }, [search, filter, tag]);
 
   return (
     <Screen
@@ -37,6 +43,14 @@ export function EntriesScreen() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
+      {tags.length > 0 && (
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+          <TagChip label="all" active={!tag} onClick={() => setTag(undefined)} />
+          {tags.map((t) => (
+            <TagChip key={t.tag} label={`${t.tag} ${t.count}`} active={tag === t.tag} onClick={() => setTag(t.tag)} />
+          ))}
+        </div>
+      )}
       {!rows ? (
         <Spinner />
       ) : rows.length === 0 ? (
@@ -63,6 +77,14 @@ export function EntriesScreen() {
         </ul>
       )}
     </Screen>
+  );
+}
+
+function TagChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button className={`shrink-0 rounded-full px-3 py-1 text-xs ${active ? "bg-accent text-bg" : "bg-surface text-muted"}`} onClick={onClick}>
+      {label}
+    </button>
   );
 }
 

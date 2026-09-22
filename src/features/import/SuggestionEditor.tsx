@@ -5,7 +5,7 @@ import type { EntryDraft, Pos, Priority, Regional } from "@/core/types";
 const POS: Pos[] = ["noun", "verb", "adj", "adv", "phrase", "prep", "conj", "pron", "interj", "num", "other"];
 const PRIORITIES: Priority[] = ["essential", "core", "standard", "niche"];
 
-export function SuggestionEditor({ draft, onSave, onCancel }: { draft: EntryDraft; onSave: (d: EntryDraft) => void; onCancel: () => void }) {
+export function SuggestionEditor({ draft, onSave, onCancel, onNever }: { draft: EntryDraft; onSave: (d: EntryDraft) => void; onCancel: () => void; onNever?: () => void }) {
   const [d, setD] = useState<EntryDraft>(structuredClone(draft));
   const set = (patch: Partial<EntryDraft>) => setD((prev) => ({ ...prev, ...patch }));
   const field = "w-full rounded-lg bg-surface-2 px-3 py-2 text-base";
@@ -101,6 +101,16 @@ export function SuggestionEditor({ draft, onSave, onCancel }: { draft: EntryDraf
           <Button className="flex-1" onClick={onCancel}>Cancel</Button>
           <Button variant="primary" className="flex-1" disabled={!d.lemma.trim() || d.senses.length === 0} onClick={() => onSave(d)}>Save</Button>
         </div>
+        {onNever && (
+          <button
+            className="mt-3 w-full py-2 text-center text-xs text-muted"
+            onClick={() => {
+              if (window.confirm(`Never suggest "${d.lemma}" again?`)) onNever();
+            }}
+          >
+            Never suggest this again
+          </button>
+        )}
       </div>
     </div>
   );

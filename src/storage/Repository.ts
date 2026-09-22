@@ -8,6 +8,7 @@ import type {
   Entry,
   IgnoreEntry,
   ImportBatch,
+  Lookup,
   ReviewLog,
   Sense,
   Sentence,
@@ -33,8 +34,10 @@ export interface Repository {
   // entries and related
   getEntry(id: string): Promise<Entry | undefined>;
   findEntry(lemma: string, pos: string): Promise<Entry | undefined>;
-  listEntries(filter?: { status?: Entry["status"]; search?: string; limit?: number }): Promise<Entry[]>;
+  listEntries(filter?: { status?: Entry["status"]; search?: string; tag?: string; limit?: number }): Promise<Entry[]>;
   allActiveEntriesById(): Promise<Map<string, Entry>>;
+  /** Tags on active entries with how many entries carry each, most used first. */
+  allTags(): Promise<{ tag: string; count: number }[]>;
   getBundle(entryId: string): Promise<EntryBundle | undefined>;
   putEntry(entry: Entry): Promise<void>;
   putEntries(entries: Entry[]): Promise<void>;
@@ -77,6 +80,12 @@ export interface Repository {
   removeIgnore(key: string): Promise<void>;
   getTensePlan(): Promise<TensePlanRow[]>;
   putTensePlan(rows: TensePlanRow[]): Promise<void>;
+
+  // translate lookups
+  putLookups(rows: Lookup[]): Promise<void>;
+  listLookups(filter?: { unconsumed?: boolean; limit?: number }): Promise<Lookup[]>;
+  countUnconsumedLookups(): Promise<number>;
+  markLookupsConsumed(ids: string[], batchId: string, at: string): Promise<void>;
 
   // whole-database operations
   exportAll(): Promise<Record<string, unknown[]>>;

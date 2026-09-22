@@ -37,18 +37,19 @@ describe("import service", () => {
     expect(byLemma.get("sábado")?.checked).toBe(true);
     expect(byLemma.get("sábado")?.draft.sourceSentence?.es).toBe("Hicimos planes para el sábado.");
     expect(byLemma.get("casa")?.existingEntryId).toBeDefined();
-    expect(byLemma.get("casa")?.checked).toBe(false);
+    // every row starts checked (drafts table: swipe away, then accept all)
+    expect(byLemma.get("casa")?.checked).toBe(true);
     expect(byLemma.get("esta")?.didYouMean).toBe("está");
-    expect(byLemma.get("esta")?.checked).toBe(false); // niche
+    expect(byLemma.get("esta")?.checked).toBe(true);
   });
 
   it("accepting creates entries, shares one sentence between parent and child, and attaches to known entries", async () => {
     const { repo, db } = fresh();
     await applySeed(repo, { version: 1, items: [{ lemma: "casa", pos: "noun", senses: ["house"] }] });
-    const batch = await createBatch(repo, { sourceType: "paste", label: "test", drafts });
+    const batch = await createBatch(repo, { sourceType: "paste", label: "test", tag: "aula p. 3", drafts });
     const sugg = await repo.suggestionsForBatch(batch.id);
-    // check "casa" (known) to attach, keep "esta" unchecked
-    await repo.putSuggestions(sugg.map((s) => (s.draft.lemma === "casa" ? { ...s, checked: true } : s)));
+    // swipe "esta" away
+    await repo.putSuggestions(sugg.map((s) => (s.draft.lemma === "esta" ? { ...s, checked: false } : s)));
 
     const res = await acceptBatch(repo, batch.id);
     expect(res.created).toBe(2); // hacer planes + sábado
@@ -56,8 +57,12 @@ describe("import service", () => {
     expect(await db.sentences.count()).toBe(1);
     const planes = await repo.findEntry("hacer planes", "phrase");
     const sabado = await repo.findEntry("sábado", "noun");
+    const casa = await repo.findEntry("casa", "noun");
     expect(planes?.isPhrase).toBe(true);
+    expect(planes?.tags).toEqual(["aula p. 3"]);
+    expect(casa?.tags).toEqual(["seed", "aula p. 3"]); // tag added to the attached existing entry
     expect(sabado?.priority).toBe("standard");
+    expect((await repo.allTags()).map((t) => t.tag)).toContain("aula p. 3");
     const encs = await db.encounters.toArray();
     expect(encs.filter((e) => e.entryId === planes!.id).length).toBe(1);
     expect(encs.find((e) => e.entryId === sabado!.id)?.span).toEqual([26, 32]);

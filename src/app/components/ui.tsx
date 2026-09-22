@@ -3,14 +3,16 @@ import { NavLink } from "react-router";
 
 export function Screen({ title, children, right }: { title?: string; children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 pb-24 pt-2">
-      {title && (
-        <header className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">{title}</h1>
-          {right}
-        </header>
-      )}
-      {children}
+    <div className="screen-scroll">
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-4 pb-24 pt-2">
+        {title && (
+          <header className="mb-4 flex items-center justify-between">
+            <h1 className="text-2xl font-semibold">{title}</h1>
+            {right}
+          </header>
+        )}
+        {children}
+      </div>
     </div>
   );
 }

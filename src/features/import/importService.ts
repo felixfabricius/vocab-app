@@ -27,6 +27,8 @@ export interface CreateBatchInput {
   label: string;
   pageRef?: string;
   imageHash?: string;
+  /** one tag for the whole batch, written on every entry it creates or touches */
+  tag?: string;
   drafts: EntryDraft[];
   /** lemma -> frequency rank, when available */
   frequency?: Map<string, number>;
@@ -63,7 +65,9 @@ export async function createBatch(repo: Repository, input: CreateBatchInput): Pr
       draft.frequencyRank = rank;
       draft.priority = priorityFromRank(rank);
     }
-    const checked = existing ? false : group === "fromSentences" ? true : draft.priority !== "niche";
+    // Every row starts checked (known ones too: accepting attaches the sentence or a new sense);
+    // the drafts table is "swipe away what you do not want, then Accept all".
+    const checked = true;
     suggestions.push({
       id: newId(),
       batchId: "",
@@ -101,9 +105,11 @@ export async function createBatch(repo: Repository, input: CreateBatchInput): Pr
     }
   }
 
+  const tag = input.tag?.trim();
   const batch: ImportBatch = {
     id: newId(),
     sourceId: source.id,
+    ...(tag ? { tag } : {}),
     stage: "drafted",
     counts: { found: input.drafts.length, known, new: suggestions.filter((s) => !s.existingEntryId).length },
     createdAt: at,
@@ -141,6 +147,7 @@ export async function acceptBatch(repo: Repository, batchId: string): Promise<Ac
   const newCards: Card[] = [];
   const sentenceByText = new Map<string, Sentence>();
   const updated: Suggestion[] = [];
+  const taggedExisting = new Map<string, Entry>();
   let created = 0;
   let attached = 0;
 
@@ -196,6 +203,9 @@ export async function acceptBatch(repo: Repository, batchId: string): Promise<Ac
       }
       const allSenses = [...(bundle?.senses ?? []), ...newSenses.filter((x) => x.entryId === existing.id)];
       newCards.push(...missingProductionCards(existing, allSenses, bundle?.cards ?? [], env));
+      if (batch.tag && !existing.tags.includes(batch.tag)) {
+        taggedExisting.set(existing.id, { ...existing, tags: [...existing.tags, batch.tag], updatedAt: at });
+      }
       attached++;
       updated.push({ ...s, decision: "accepted", existingEntryId: existing.id });
       continue;
@@ -216,7 +226,7 @@ export async function acceptBatch(repo: Repository, batchId: string): Promise<Ac
       ...(d.cefr ? { cefr: d.cefr } : {}),
       regional: d.regional,
       ...(d.note ? { note: d.note } : {}),
-      tags: [],
+      tags: batch.tag ? [batch.tag] : [],
       ...(d.pos === "verb" ? { verb: { irregular: d.verb?.irregular ?? false, paradigmCards: "auto" as const } } : {}),
       status: "active",
       sourceIds: [batch.sourceId],
@@ -242,7 +252,7 @@ export async function acceptBatch(repo: Repository, batchId: string): Promise<Ac
     updated.push({ ...s, decision: "accepted", existingEntryId: entry.id });
   }
 
-  await repo.putEntries(newEntries);
+  await repo.putEntries([...newEntries, ...taggedExisting.values()]);
   await repo.putSenses(newSenses);
   await repo.putSentences(newSentences);
   await repo.putEncounters(newEncounters);

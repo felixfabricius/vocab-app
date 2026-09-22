@@ -46,7 +46,7 @@ describe("review session", () => {
     expect(s.learning.map((c) => c.id)).toEqual(["a"]);
     expect(s.current?.id).toBe("b");
 
-    r = grade(flip(s), "easy", env);
+    r = grade(flip(s), "good", env);
     s = r.state;
     // queue empty, "a" not due yet but shown ahead rather than ending
     expect(s.current?.id).toBe("a");
@@ -94,14 +94,14 @@ describe("review session", () => {
 
   it("suspends and flags a card that reaches the leech threshold", () => {
     const leechEnv: ReviewEnv = { ...env, leechThresholdOf: () => 1 };
-    let s = start(createReviewState([card("a")], []), leechEnv);
-    let r = grade(flip(s), "easy", leechEnv);
-    s = r.state;
-    // bring it back as due and fail it
+    // a card already in review state (graduated during the web phase, say)
+    const reviewed: Card = {
+      ...card("a"),
+      fsrs: { ...newFsrsState(new Date(clock)), state: 2, stability: 5, difficulty: 5, reps: 3, scheduledDays: 5, lastReview: new Date(clock).toISOString() },
+    };
     clock += 30 * 86_400_000;
-    const reviewed = r.effects.upsertCards![0]!;
-    s = start(createReviewState([reviewed], []), leechEnv);
-    r = grade(flip(s), "again", leechEnv);
+    let s = start(createReviewState([reviewed], []), leechEnv);
+    const r = grade(flip(s), "again", leechEnv);
     const after = r.effects.upsertCards![0]!;
     expect(after.fsrs.lapses).toBe(1);
     expect(after.status).toBe("suspended");
