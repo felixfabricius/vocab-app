@@ -30,15 +30,37 @@ export function newLookup(o: { dir: Lookup["dir"]; src: string; dst: string; pro
  * side the gloss. Whole sentences become phrase drafts too (SPEC-NATIVE §4a: every
  * lookup becomes a draft; unwanted rows are swiped away in the table).
  */
+// LANG: a leading article on a single noun ("la casa", "the house") becomes gender + article.
+const ES_ARTICLES: Record<string, { gender: "m" | "f"; article: string }> = {
+  el: { gender: "m", article: "el" },
+  la: { gender: "f", article: "la" },
+  un: { gender: "m", article: "el" },
+  una: { gender: "f", article: "la" },
+  los: { gender: "m", article: "el" },
+  las: { gender: "f", article: "la" },
+};
+const EN_ARTICLES = /^(the|a|an)\s+/i;
+
 export function draftFromLookupRow(r: { dir: "en-es" | "es-en"; src: string; dst: string }): EntryDraft | undefined {
-  const es = (r.dir === "en-es" ? r.dst : r.src).replace(/[.!?¡¿]+$/g, "").trim();
-  const en = (r.dir === "en-es" ? r.src : r.dst).replace(/[.!?]+$/g, "").trim();
+  let es = (r.dir === "en-es" ? r.dst : r.src).replace(/[.!?¡¿]+$/g, "").trim();
+  let en = (r.dir === "en-es" ? r.src : r.dst).replace(/[.!?]+$/g, "").trim();
   if (!es || !en) return undefined;
+  let noun: { gender: "m" | "f"; article: string } | undefined;
+  const esWords = es.split(/\s+/);
+  const lead = esWords[0]?.toLowerCase() ?? "";
+  if (esWords.length === 2 && ES_ARTICLES[lead]) {
+    noun = ES_ARTICLES[lead];
+    es = esWords[1]!;
+    en = en.replace(EN_ARTICLES, "");
+  } else if (esWords.length === 1 && EN_ARTICLES.test(en) && en.split(/\s+/).length === 2) {
+    en = en.replace(EN_ARTICLES, "");
+  }
   const words = es.split(/\s+/).length;
   return {
     lemma: es,
-    pos: words > 1 ? "phrase" : "other",
+    pos: noun ? "noun" : words > 1 ? "phrase" : "other",
     isPhrase: words > 1,
+    ...(noun ? { gender: noun.gender, article: noun.article } : {}),
     senses: [{ gloss: en }],
     priority: "standard",
     regional: "neutral",

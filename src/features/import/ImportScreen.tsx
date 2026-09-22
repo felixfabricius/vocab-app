@@ -235,8 +235,8 @@ export function ImportScreen() {
         <Card className="mb-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm">
-              <div className="font-medium">{bareCount} entries without sentences</div>
-              <div className="text-muted">Add examples, gender, notes with Claude (max 60 per run).</div>
+              <div className="font-medium">{bareCount} entries to complete</div>
+              <div className="text-muted">Words without an example sentence or nouns without an article: Claude adds sentences, gender, notes (max 60 per run).</div>
             </div>
             <Button disabled={!!busy || job?.status === "running"} onClick={onEnrichAll}>Enrich</Button>
           </div>

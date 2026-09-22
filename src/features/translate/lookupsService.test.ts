@@ -19,6 +19,17 @@ describe("lookups → drafts", () => {
     expect(draftFromLookupRow({ dir: "es-en", src: "", dst: "x" })).toBeUndefined();
   });
 
+  it("turns a leading article into gender and article on a single noun", () => {
+    const a = draftFromLookupRow({ dir: "en-es", src: "the house", dst: "la casa" });
+    expect(a).toMatchObject({ lemma: "casa", pos: "noun", isPhrase: false, gender: "f", article: "la", senses: [{ gloss: "house" }] });
+    const b = draftFromLookupRow({ dir: "es-en", src: "un perro", dst: "a dog" });
+    expect(b).toMatchObject({ lemma: "perro", gender: "m", article: "el", senses: [{ gloss: "dog" }] });
+    const c = draftFromLookupRow({ dir: "en-es", src: "the market", dst: "mercado" });
+    expect(c).toMatchObject({ lemma: "mercado", pos: "other", senses: [{ gloss: "market" }] });
+    // three words stay a phrase
+    expect(draftFromLookupRow({ dir: "en-es", src: "the big house", dst: "la casa grande" })?.pos).toBe("phrase");
+  });
+
   it("builds minimal drafts from either direction and prefers a stored Claude draft", () => {
     const a = draftFromLookup(newLookup({ dir: "en-es", src: "right away", dst: "al tiro", provider: "apple" }));
     expect(a?.lemma).toBe("al tiro");

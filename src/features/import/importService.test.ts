@@ -62,7 +62,8 @@ describe("import service", () => {
     expect(planes?.isPhrase).toBe(true);
     expect(planes?.tags).toEqual(["aula p. 3"]);
     expect(casa?.tags).toEqual(["seed", "aula p. 3"]); // tag added to the attached existing entry
-    expect(await repo.entryIdsWithoutSentences()).toEqual([casa!.id]); // the seed noun; phrases never appear
+    // the seed noun (no sentence) and sábado (noun without article); the phrase never appears
+    expect((await repo.entryIdsWithoutSentences()).sort()).toEqual([casa!.id, sabado!.id].sort());
     expect(sabado?.priority).toBe("standard");
     expect((await repo.allTags()).map((t) => t.tag)).toContain("aula p. 3");
     const encs = await db.encounters.toArray();

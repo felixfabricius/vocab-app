@@ -161,9 +161,10 @@ export class DexieRepository implements Repository {
       this.db.encounters.toArray(),
     ]);
     const has = new Set(encounters.map((e) => e.entryId));
-    // A phrase is its own example; only single words are candidates for enrichment.
+    // A phrase is its own example; single words without a sentence, and nouns without an
+    // article (offline-translate lookups), are the candidates for enrichment.
     return entries
-      .filter((e) => !has.has(e.id) && !e.isPhrase && e.pos !== "phrase")
+      .filter((e) => !e.isPhrase && e.pos !== "phrase" && (!has.has(e.id) || (e.pos === "noun" && !e.article)))
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
       .map((e) => e.id);
   }
