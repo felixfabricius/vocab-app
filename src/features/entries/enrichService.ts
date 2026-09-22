@@ -179,6 +179,8 @@ async function applyDraft(repo: Repository, entry: Entry, senses: Sense[], sente
     ...entry,
     ...(d.gender && !entry.gender ? { gender: d.gender } : {}),
     ...(d.article && !entry.article ? { article: d.article } : {}),
+    // LANG: an entry that has a gender but no article gets it derived
+    ...(!d.article && !entry.article && entry.pos === "noun" && (entry.gender ?? d.gender) ? { article: (entry.gender ?? d.gender) === "f" ? "la" : "el" } : {}),
     ...(d.plural && !entry.plural ? { plural: d.plural } : {}),
     ...(d.cefr && !entry.cefr ? { cefr: d.cefr } : {}),
     ...(d.note && !entry.note ? { note: d.note } : {}),

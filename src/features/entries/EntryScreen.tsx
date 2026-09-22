@@ -156,7 +156,15 @@ export function EntryScreen() {
           <div className="mt-3 grid grid-cols-3 gap-2">
             <div>
               <label className="mb-1 block text-xs text-muted">Gender</label>
-              <select className={field} value={entry.gender ?? ""} onChange={(e) => void patch({ gender: (e.target.value || undefined) as "m" | "f" | undefined })}>
+              <select
+                className={field}
+                value={entry.gender ?? ""}
+                onChange={(e) => {
+                  const gender = (e.target.value || undefined) as "m" | "f" | undefined;
+                  // LANG: derive the article when none is set yet
+                  void patch({ gender, ...(gender && !entry.article ? { article: gender === "f" ? "la" : "el" } : {}) });
+                }}
+              >
                 <option value="">—</option>
                 <option value="m">m</option>
                 <option value="f">f</option>
@@ -164,7 +172,7 @@ export function EntryScreen() {
             </div>
             <div>
               <label className="mb-1 block text-xs text-muted">Article</label>
-              <input className={field} defaultValue={entry.article ?? ""} onBlur={(e) => void patch({ article: e.target.value || undefined })} />
+              <input key={entry.article ?? ""} className={field} defaultValue={entry.article ?? ""} onBlur={(e) => void patch({ article: e.target.value || undefined })} />
             </div>
             <div>
               <label className="mb-1 block text-xs text-muted">Plural</label>

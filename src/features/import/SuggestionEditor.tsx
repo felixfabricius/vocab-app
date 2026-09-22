@@ -36,7 +36,14 @@ export function SuggestionEditor({ draft, onSave, onCancel, onNever }: { draft: 
           <div className="mt-3 grid grid-cols-3 gap-2">
             <div>
               <label className="mb-1 block text-xs text-muted">Gender</label>
-              <select className={field} value={d.gender ?? ""} onChange={(e) => set({ gender: (e.target.value || undefined) as "m" | "f" | undefined })}>
+              <select
+                className={field}
+                value={d.gender ?? ""}
+                onChange={(e) => {
+                  const gender = (e.target.value || undefined) as "m" | "f" | undefined;
+                  set({ gender, ...(gender && !d.article ? { article: gender === "f" ? "la" : "el" } : {}) });
+                }}
+              >
                 <option value="">—</option>
                 <option value="m">m</option>
                 <option value="f">f</option>
