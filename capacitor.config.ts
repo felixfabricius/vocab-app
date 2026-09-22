@@ -14,6 +14,8 @@ const config: CapacitorConfig = {
     scrollEnabled: true,
   },
   plugins: { Keyboard: { resize: "native" } },
+  // `cap sync` derives `.iOS(.v26)` from the deployment target; the default tools version 5.9 does not know it.
+  experimental: { ios: { spm: { swiftToolsVersion: "6.2" } } },
 };
 
 export default config;
