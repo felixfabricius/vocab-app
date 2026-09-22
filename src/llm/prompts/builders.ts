@@ -75,23 +75,25 @@ export function textbookPrompt(ctx: BuilderContext, f: TextbookFields): BuiltPro
 }
 
 export interface BookFields {
-  book: string;
+  book?: string;
   tag?: string;
   density?: Density;
 }
 
-export function bookTag(f: BookFields): string {
-  return (f.tag?.trim() || f.book.trim()).trim();
+/** Book is optional; without it the tag is "book <date>". */
+export function bookTag(f: BookFields, today = new Date()): string {
+  return (f.tag?.trim() || f.book?.trim() || `book ${today.toISOString().slice(0, 10)}`).trim();
 }
 
 export function bookPrompt(ctx: BuilderContext, f: BookFields): BuiltPrompt {
   const tag = bookTag(f);
+  const name = f.book?.trim();
   return {
     tag,
     prompt: buildExtractPrompt({
       format: "paste",
       ...ctx,
-      sourceHint: `a photo of a page from the book "${f.book.trim()}" (fiction or non-fiction). Copy the sentence each item occurs in`,
+      sourceHint: `one or more photos of pages from a book${name ? ` ("${name}")` : ""}, fiction or non-fiction. Copy the sentence each item occurs in`,
       density: f.density ?? "unknown",
       batchTag: tag,
     }),

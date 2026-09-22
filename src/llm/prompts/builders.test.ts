@@ -31,6 +31,7 @@ describe("prompt builders", () => {
   it("book: density guidance", () => {
     expect(bookPrompt(ctx, { book: "Cien años", density: "all" }).prompt).toContain("Take everything");
     expect(bookPrompt(ctx, { book: "Cien años" }).prompt).toContain("unlikely to know");
+    expect(bookPrompt(ctx, {}).tag).toMatch(/^book \d{4}-\d{2}-\d{2}$/);
   });
 
   it("context: no source text, invented vocabulary", () => {

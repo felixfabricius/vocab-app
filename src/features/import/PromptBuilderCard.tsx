@@ -49,7 +49,7 @@ export function PromptBuilderCard({ getContext, onCopied, paste, setPaste, onImp
       case "textbook":
         return textbookPrompt(ctx, { book, page, tag: t });
       case "book":
-        return book.trim() ? bookPrompt(ctx, { book, tag: t, density }) : undefined;
+        return bookPrompt(ctx, { book, tag: t, density });
       case "context":
         return situation.trim() ? contextPrompt(ctx, { situation, tag: t, targetCount: n }) : undefined;
     }
@@ -116,7 +116,7 @@ export function PromptBuilderCard({ getContext, onCopied, paste, setPaste, onImp
       )}
       {kind === "book" && (
         <div className="space-y-2">
-          <input className={field} placeholder="Book" value={book} onChange={(e) => setBook(e.target.value)} />
+          <input className={field} placeholder="Book (optional)" value={book} onChange={(e) => setBook(e.target.value)} />
           <select className={field} value={density} onChange={(e) => setDensity(e.target.value as Density)}>
             <option value="unknown">unknown-looking words</option>
             <option value="content">all content words</option>

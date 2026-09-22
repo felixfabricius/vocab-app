@@ -79,7 +79,7 @@ export function buildExtractPrompt(o: ExtractPromptOptions): string {
     "",
     "## Input",
     o.sourceHint ? `The input is: ${o.sourceHint}.` : "The input is a photo or text containing Spanish.",
-    "Several photos are consecutive pages of the same source; read them all and return one combined list without duplicates.",
+    "If there are several photos, they belong to the same source (not necessarily consecutive pages); read them all and return one combined list without duplicates.",
     o.situation
       ? `There is no source text. Invent the vocabulary and sentences a learner needs for this situation: ${o.situation}`
       : "It may mix Spanish with English or German (textbook glosses, translations). Use an adjacent English or German gloss as a hint for the meaning. Never create entries for English or German words. If the input is a two-column vocabulary list, one item per row.",
