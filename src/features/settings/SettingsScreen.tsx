@@ -73,13 +73,16 @@ function CloudCard() {
 
 function TranslateSettings({ settings, update }: { settings: Settings; update: (p: Partial<Settings>) => Promise<Settings> }) {
   const [packs, setPacks] = useState<Record<"en-es" | "es-en", PackStatus | "checking" | "error">>({ "en-es": "checking", "es-en": "checking" });
+  const [errors, setErrors] = useState<string | undefined>();
   const refresh = async () => {
     for (const dir of ["en-es", "es-en"] as const) {
       try {
         const s = await packStatus(dir);
         setPacks((p) => ({ ...p, [dir]: s }));
-      } catch {
+      } catch (e) {
         setPacks((p) => ({ ...p, [dir]: "error" }));
+        setErrors((e as Error).message);
+        console.warn(`translate status ${dir}`, e);
       }
     }
   };
@@ -112,6 +115,7 @@ function TranslateSettings({ settings, update }: { settings: Settings; update: (
         </Row>
       ))}
       <p className="mt-1 text-xs text-muted">Packs are downloaded once through Apple's Translate sheet and then work offline.</p>
+      {errors && <p className="mt-1 text-xs text-again">{errors}</p>}
     </Card>
   );
 }

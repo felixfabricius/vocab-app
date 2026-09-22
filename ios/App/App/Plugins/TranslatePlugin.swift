@@ -11,6 +11,7 @@ public class TranslatePlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "TranslatePlugin"
     public let jsName = "Translate"
     public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "languages", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "prepare", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "translate", returnType: CAPPluginReturnPromise),
@@ -18,6 +19,32 @@ public class TranslatePlugin: CAPPlugin, CAPBridgedPlugin {
 
     private let coordinator = TranslatorCoordinator()
     private var host: UIHostingController<TranslatorHost>?
+    private var supported: [Locale.Language]?
+
+    /// The framework lists regional languages (es-ES, en-US). A bare code such as "es"
+    /// is mapped to the first supported language with that language code, preferring
+    /// the regions the learner is likely to have downloaded.
+    private func resolve(_ code: String) async -> Locale.Language {
+        if supported == nil {
+            supported = await LanguageAvailability().supportedLanguages
+        }
+        let wanted = Locale.Language(identifier: code)
+        guard wanted.region == nil, let list = supported else { return wanted }
+        let candidates = list.filter { $0.languageCode == wanted.languageCode }
+        let preferred = ["US", "ES", "GB", "MX", "419"]
+        for region in preferred {
+            if let match = candidates.first(where: { $0.region?.identifier == region }) { return match }
+        }
+        return candidates.first ?? wanted
+    }
+
+    /// Every language the framework can translate, as identifiers (for diagnostics).
+    @objc func languages(_ call: CAPPluginCall) {
+        Task {
+            let list = await LanguageAvailability().supportedLanguages
+            call.resolve(["languages": list.map { $0.maximalIdentifier }])
+        }
+    }
 
     public override func load() {
         DispatchQueue.main.async {
@@ -39,8 +66,9 @@ public class TranslatePlugin: CAPPlugin, CAPBridgedPlugin {
         let from = call.getString("from") ?? "es"
         let to = call.getString("to") ?? "en"
         Task {
-            let availability = LanguageAvailability()
-            let status = await availability.status(from: Locale.Language(identifier: from), to: Locale.Language(identifier: to))
+            let source = await resolve(from)
+            let target = await resolve(to)
+            let status = await LanguageAvailability().status(from: source, to: target)
             let text: String
             switch status {
             case .installed: text = "installed"
@@ -48,7 +76,7 @@ public class TranslatePlugin: CAPPlugin, CAPBridgedPlugin {
             case .unsupported: text = "unsupported"
             @unknown default: text = "unsupported"
             }
-            call.resolve(["status": text])
+            call.resolve(["status": text, "from": source.maximalIdentifier, "to": target.maximalIdentifier])
         }
     }
 
@@ -56,10 +84,14 @@ public class TranslatePlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func prepare(_ call: CAPPluginCall) {
         let from = call.getString("from") ?? "es"
         let to = call.getString("to") ?? "en"
-        coordinator.enqueue(from: from, to: to, text: nil) { result in
-            switch result {
-            case .success: call.resolve()
-            case .failure(let error): call.reject(error.localizedDescription, "failed")
+        Task {
+            let source = await resolve(from)
+            let target = await resolve(to)
+            coordinator.enqueue(source: source, target: target, text: nil) { result in
+                switch result {
+                case .success: call.resolve()
+                case .failure(let error): call.reject(error.localizedDescription, "failed")
+                }
             }
         }
     }
@@ -71,10 +103,14 @@ public class TranslatePlugin: CAPPlugin, CAPBridgedPlugin {
         }
         let from = call.getString("from") ?? "es"
         let to = call.getString("to") ?? "en"
-        coordinator.enqueue(from: from, to: to, text: text) { result in
-            switch result {
-            case .success(let translated): call.resolve(["text": translated])
-            case .failure(let error): call.reject(error.localizedDescription, "failed")
+        Task {
+            let source = await resolve(from)
+            let target = await resolve(to)
+            coordinator.enqueue(source: source, target: target, text: text) { result in
+                switch result {
+                case .success(let translated): call.resolve(["text": translated])
+                case .failure(let error): call.reject(error.localizedDescription, "failed")
+                }
             }
         }
     }
@@ -91,7 +127,7 @@ final class TranslatorCoordinator: ObservableObject {
     private var draining = false
     private let lock = NSLock()
 
-    func enqueue(from: String, to: String, text: String?, completion: @escaping (Result<String, Error>) -> Void) {
+    func enqueue(source: Locale.Language, target: Locale.Language, text: String?, completion: @escaping (Result<String, Error>) -> Void) {
         lock.lock()
         pending.append(Job(text: text, completion: completion))
         let busy = draining
@@ -99,8 +135,6 @@ final class TranslatorCoordinator: ObservableObject {
         DispatchQueue.main.async {
             // A running drain picks the job up; otherwise (re)start the translation task.
             if busy { return }
-            let source = Locale.Language(identifier: from)
-            let target = Locale.Language(identifier: to)
             if var current = self.configuration, current.source == source, current.target == target {
                 current.invalidate()
                 self.configuration = current

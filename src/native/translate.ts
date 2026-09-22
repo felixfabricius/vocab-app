@@ -8,7 +8,8 @@ import { toNativeError } from "./platform";
 export type PackStatus = "installed" | "supported" | "unsupported";
 
 interface TranslatePlugin {
-  status(o: { from: string; to: string }): Promise<{ status: PackStatus }>;
+  languages(): Promise<{ languages: string[] }>;
+  status(o: { from: string; to: string }): Promise<{ status: PackStatus; from: string; to: string }>;
   prepare(o: { from: string; to: string }): Promise<void>;
   translate(o: { text: string; from: string; to: string }): Promise<{ text: string }>;
 }
@@ -25,6 +26,23 @@ export function langsFor(dir: "en-es" | "es-en"): { from: string; to: string } {
 export async function packStatus(dir: "en-es" | "es-en"): Promise<PackStatus> {
   try {
     return (await Translate.status(langsFor(dir))).status;
+  } catch (e) {
+    throw toNativeError(e);
+  }
+}
+
+/** Resolved pair and status, for diagnostics. */
+export async function packDetails(dir: "en-es" | "es-en"): Promise<{ status: PackStatus; from: string; to: string }> {
+  try {
+    return await Translate.status(langsFor(dir));
+  } catch (e) {
+    throw toNativeError(e);
+  }
+}
+
+export async function translateLanguages(): Promise<string[]> {
+  try {
+    return (await Translate.languages()).languages;
   } catch (e) {
     throw toNativeError(e);
   }

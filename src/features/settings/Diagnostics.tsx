@@ -3,6 +3,11 @@ import { getAudio } from "@/app/services";
 import { clearLog, getLog, subscribeLog } from "@/app/log";
 import type { VoiceInfo } from "@/audio/AudioPlayer";
 import { isNative, platform } from "@/native/platform";
+import { copyText } from "@/native/clipboard";
+import { speechAvailable } from "@/native/speech";
+import { packDetails, translateLanguages } from "@/native/translate";
+import { NativeCloudFiles } from "@/native/cloudFiles";
+import { VARIETY } from "@/config/variety";
 
 /**
  * Device checks: which Spanish voices the platform exposes (Web Speech on the
@@ -17,6 +22,7 @@ export function Diagnostics() {
   const [storage, setStorage] = useState<string>("checking…");
   const [log, setLog] = useState<string[]>(getLog());
   const [copied, setCopied] = useState(false);
+  const [plugins, setPlugins] = useState<string[]>([]);
   const audio = getAudio();
 
   useEffect(() => {
@@ -75,14 +81,32 @@ export function Diagnostics() {
     }
   }
 
-  async function copyLog() {
-    try {
-      await navigator.clipboard.writeText(log.join("\n"));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (e) {
-      setMic(`clipboard: ${(e as Error).message}`);
-    }
+  function copyLog() {
+    copyText(log.join("\n"))
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch((e: Error) => setMic(`clipboard: ${e.message}`));
+  }
+
+  async function checkPlugins() {
+    const out: string[] = [];
+    const probe = async (label: string, fn: () => Promise<unknown>) => {
+      try {
+        out.push(`${label}: ${JSON.stringify(await fn())}`);
+      } catch (e) {
+        const err = e as { code?: string; message?: string };
+        out.push(`${label}: ERROR ${err.code ?? ""} ${err.message ?? String(e)}`);
+      }
+    };
+    await probe("Speech es", () => speechAvailable(VARIETY.asrLocale));
+    await probe("Speech en", () => speechAvailable("en-US"));
+    await probe("Translate languages", () => translateLanguages());
+    await probe("Translate en-es", () => packDetails("en-es"));
+    await probe("Translate es-en", () => packDetails("es-en"));
+    await probe("CloudFiles", () => new NativeCloudFiles().available());
+    setPlugins(out);
   }
 
   return (
@@ -148,11 +172,23 @@ export function Diagnostics() {
         {mic && <p className="mt-2 text-sm text-muted">{mic}</p>}
       </section>
 
+      {isNative() && (
+        <section className="rounded-xl bg-surface p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="font-medium">Native plugins</h2>
+            <button className="rounded-md bg-surface-2 px-3 py-1 text-sm" onClick={() => void checkPlugins()}>
+              Check
+            </button>
+          </div>
+          <pre className="whitespace-pre-wrap break-words text-[11px] leading-snug text-muted">{plugins.join("\n")}</pre>
+        </section>
+      )}
+
       <section className="rounded-xl bg-surface p-4">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="font-medium">Log ({log.length})</h2>
           <div className="flex gap-2 text-sm">
-            <button className="rounded-md bg-surface-2 px-3 py-1" onClick={() => void copyLog()}>
+            <button className="rounded-md bg-surface-2 px-3 py-1" onClick={copyLog}>
               {copied ? "Copied" : "Copy"}
             </button>
             <button className="rounded-md bg-surface-2 px-3 py-1" onClick={() => { clearLog(); setLog([]); }}>

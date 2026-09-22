@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card } from "@/app/components/ui";
+import { copyText } from "@/native/clipboard";
 import type { BuilderContext, BuiltPrompt } from "@/llm/prompts/builders";
 import { bookPrompt, contextPrompt, seriesPrompt, textbookPrompt } from "@/llm/prompts/builders";
 import type { Density, PhrasePreference } from "@/llm/prompts/extract";
@@ -54,19 +55,28 @@ export function PromptBuilderCard({ getContext, onCopied, paste, setPaste, onImp
     }
   }
 
-  async function copy() {
-    const built = build(await getContext());
+  // Known lemmas etc. are fetched up front so the copy happens synchronously in the tap (web clipboard rule).
+  const [ctx, setCtx] = useState<BuilderContext | undefined>();
+  useEffect(() => {
+    void getContext().then(setCtx);
+  }, [getContext]);
+
+  function copy() {
+    if (!ctx) {
+      setMsg("Still loading your word list; try again in a moment.");
+      return;
+    }
+    const built = build(ctx);
     if (!built) {
       setMsg("Fill in the first field.");
       return;
     }
-    try {
-      await navigator.clipboard.writeText(built.prompt);
-      setMsg(`Prompt copied (tag “${built.tag}”). Paste it into the Claude app with the ${kind === "series" ? "subtitle text" : kind === "context" ? "situation" : "photo"}, then paste the reply below.`);
-    } catch {
-      setMsg("Clipboard blocked; the prompt is in the box below, long-press to copy it.");
-      setPaste(built.prompt);
-    }
+    copyText(built.prompt)
+      .then(() => setMsg(`Prompt copied (tag “${built.tag}”). Paste it into the Claude app with the ${kind === "series" ? "subtitle text" : kind === "context" ? "situation" : "photo"}, then paste the reply below.`))
+      .catch((e: Error) => {
+        setMsg(`Clipboard blocked (${e.message}); the prompt is in the box below, long-press to copy it.`);
+        setPaste(built.prompt);
+      });
     onCopied(built);
   }
 
@@ -122,7 +132,7 @@ export function PromptBuilderCard({ getContext, onCopied, paste, setPaste, onImp
       )}
       <input className={`${field} mt-2`} placeholder="Tag (optional; default from the fields above)" value={tag} onChange={(e) => setTag(e.target.value)} />
 
-      <Button className="mt-3 w-full" onClick={() => void copy()}>
+      <Button className="mt-3 w-full" onClick={copy}>
         Copy prompt
       </Button>
       {msg && <div className="mt-2 rounded-lg bg-surface-2 p-2 text-xs">{msg}</div>}

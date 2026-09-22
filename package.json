@@ -21,6 +21,7 @@
     "@anthropic-ai/sdk": "^0.126.0",
     "@capacitor-community/text-to-speech": "^8.0.2",
     "@capacitor/app": "^8.1.1",
+    "@capacitor/clipboard": "^8.0.1",
     "@capacitor/core": "^8.5.2",
     "@capacitor/keyboard": "^8.0.5",
     "dexie": "^4.4.6",
