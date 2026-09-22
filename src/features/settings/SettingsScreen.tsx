@@ -8,6 +8,53 @@ import { exportBackup, importBackup, parseBackup, saveBackupFile } from "@/stora
 import type { VoiceInfo } from "@/audio/AudioPlayer";
 import { MODEL_CHOICES } from "@/llm/pricing";
 import { isNative } from "@/native/platform";
+import { packStatus, preparePack, type PackStatus } from "@/native/translate";
+import type { Settings } from "@/core/types";
+
+function TranslateSettings({ settings, update }: { settings: Settings; update: (p: Partial<Settings>) => Promise<Settings> }) {
+  const [packs, setPacks] = useState<Record<"en-es" | "es-en", PackStatus | "checking" | "error">>({ "en-es": "checking", "es-en": "checking" });
+  const refresh = async () => {
+    for (const dir of ["en-es", "es-en"] as const) {
+      try {
+        const s = await packStatus(dir);
+        setPacks((p) => ({ ...p, [dir]: s }));
+      } catch {
+        setPacks((p) => ({ ...p, [dir]: "error" }));
+      }
+    }
+  };
+  useEffect(() => {
+    void refresh();
+  }, []);
+  async function download(dir: "en-es" | "es-en") {
+    try {
+      await preparePack(dir);
+    } catch {
+      // the sheet was dismissed or failed; the status below tells the truth
+    }
+    await refresh();
+  }
+  const label = (s: PackStatus | "checking" | "error") =>
+    s === "installed" ? "installed" : s === "supported" ? "not downloaded" : s === "unsupported" ? "not available" : s;
+  return (
+    <Card className="mb-4">
+      <h2 className="mb-1 font-medium">Translate</h2>
+      <Row label="Default translator">
+        <select className="rounded-lg bg-surface-2 px-2 py-1" value={settings.translateProvider} onChange={(e) => void update({ translateProvider: e.target.value as Settings["translateProvider"] })}>
+          <option value="apple">Offline (Apple)</option>
+          <option value="claude">Claude</option>
+        </select>
+      </Row>
+      {(["en-es", "es-en"] as const).map((dir) => (
+        <Row key={dir} label={dir === "en-es" ? "English → Spanish pack" : "Spanish → English pack"}>
+          <span className="text-sm text-muted">{label(packs[dir])}</span>
+          {packs[dir] === "supported" && <Button onClick={() => void download(dir)}>Download</Button>}
+        </Row>
+      ))}
+      <p className="mt-1 text-xs text-muted">Packs are downloaded once through Apple's Translate sheet and then work offline.</p>
+    </Card>
+  );
+}
 
 export function SettingsScreen() {
   const nav = useNavigate();
@@ -148,6 +195,8 @@ export function SettingsScreen() {
           Test voice
         </Button>
       </Card>
+
+      {isNative() && <TranslateSettings settings={settings} update={update} />}
 
       <Card className="mb-4">
         <h2 className="mb-1 font-medium">Claude API</h2>

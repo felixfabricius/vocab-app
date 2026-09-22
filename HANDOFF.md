@@ -114,7 +114,7 @@ Semantics that matter:
 
 ## 9. Translate today
 
-- In-app: Claude only (`translateWithClaude`, returns translation, alternatives, note, optional draft), microphone via Whisper, "Add as card" → batch. No offline translation in the web app (browsers have no on-device translator on iOS).
+- In-app (native, since M3): Apple Translation framework by default (`src/native/translate.ts` over `TranslatePlugin.swift`), Claude as the explicit button; own mic button streams on-device recognition per direction (`NativeLiveTranscriber` over `SpeechPlugin.swift`); every lookup is a `lookups` row; "Create cards" on Import turns unconsumed lookups into an enriched drafts table. The web app keeps Claude + Whisper.
 - Lock screen: four Kurzbefehle (see `shortcuts/README.md`) using Apple's on-device Translate; each appends `date ||| dir ||| input ||| translation` to `iCloud Drive/Kurzbefehle/vocab-import/translate-log.txt`. Import picks the file; only rows newer than `settings.translateLogImportedUntil` are used; items ≤ 8 words become drafts, longer ones are skipped.
 
 ## 10. Facts that constrain the native phase
@@ -129,7 +129,7 @@ Semantics that matter:
 
 ## 11. Known gaps and small bugs to carry over
 
-- Native phase progress (2026-09-22): M1 (wrapper, CI, TestFlight) built and uploaded; its phone checklist is still to be ticked. M2 (Again/Good only, scroll containment with `scrollEnabled: false`, tags with Dexie v2, study by tag, flat drafts table with swipe-to-remove, jobs with progress + cancel) is implemented; M3 is next.
+- Native phase progress (2026-09-22): M1 (wrapper, CI, TestFlight) built and uploaded; its phone checklist is still to be ticked. M2 (Again/Good only, scroll containment with `scrollEnabled: false`, tags with Dexie v2, study by tag, flat drafts table with swipe-to-remove, jobs with progress + cancel) and M3 (first Swift plugins `Speech` and `Translate` registered in `ViewController.swift`, added to the project in CI by `scripts/ios/sync-project.rb`; offline translate with pack download in Settings; live on-device dictation; lookups table + "Create cards" with automatic enrichment of drafts via `enrichBatchDrafts`; manual add with "Complete with AI") are implemented but not yet verified on the phone; M4 is next.
 - Fixed 2026-09-21: the schema bug that broke every Claude call, and the English meaning on both sides of conjugation cards.
 - `settings.playback = "handsFree"` is defined but unused (M7).
 - Suggestion editor edits `generatedSentence.es` and clears its span (the highlight disappears after editing a sentence; recomputed only if `target` is re-derived; acceptable).

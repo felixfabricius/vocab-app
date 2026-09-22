@@ -82,28 +82,38 @@ export function latestTimestamp(rows: TranslateLogRow[]): string | undefined {
   return Number.isNaN(max) ? undefined : new Date(max).toISOString();
 }
 
-/** Minimal drafts: the Spanish side becomes the lemma, the English side the gloss. Claude can enrich later. */
+/**
+ * Minimal draft for one lookup: the Spanish side becomes the lemma, the English
+ * side the gloss. Whole sentences become phrase drafts too (SPEC-NATIVE §4a: every
+ * lookup becomes a draft; unwanted rows are swiped away in the table).
+ */
+export function draftFromLookupRow(r: { dir: "en-es" | "es-en"; src: string; dst: string }): EntryDraft | undefined {
+  const es = (r.dir === "en-es" ? r.dst : r.src).replace(/[.!?¡¿]+$/g, "").trim();
+  const en = (r.dir === "en-es" ? r.src : r.dst).replace(/[.!?]+$/g, "").trim();
+  if (!es || !en) return undefined;
+  const words = es.split(/\s+/).length;
+  return {
+    lemma: es,
+    pos: words > 1 ? "phrase" : "other",
+    isPhrase: words > 1,
+    senses: [{ gloss: en }],
+    priority: "standard",
+    regional: "neutral",
+    fromSentence: [],
+  };
+}
+
+/** One draft per distinct Spanish text. */
 export function draftsFromTranslateLog(rows: TranslateLogRow[]): EntryDraft[] {
   const out: EntryDraft[] = [];
   const seen = new Set<string>();
   for (const r of rows) {
-    const es = (r.dir === "en-es" ? r.dst : r.src).replace(/[.!?¡¿]+$/g, "").trim();
-    const en = (r.dir === "en-es" ? r.src : r.dst).replace(/[.!?]+$/g, "").trim();
-    if (!es || !en) continue;
-    const words = es.split(/\s+/).length;
-    if (words > 8) continue; // full sentences are not flashcards; keep them for the sentence bank later
-    const key = es.toLowerCase();
+    const d = draftFromLookupRow(r);
+    if (!d) continue;
+    const key = d.lemma.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({
-      lemma: es,
-      pos: words > 1 ? "phrase" : "other",
-      isPhrase: words > 1,
-      senses: [{ gloss: en }],
-      priority: "standard",
-      regional: "neutral",
-      fromSentence: [],
-    });
+    out.push(d);
   }
   return out;
 }

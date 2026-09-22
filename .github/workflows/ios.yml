@@ -51,10 +51,12 @@ jobs:
 
       # M6+: brew install xcodegen && (cd ios/App && xcodegen generate)
       - run: pnpm exec cap sync ios
-      # M3–M5: ruby scripts/ios/sync-project.rb
 
       - name: Install fastlane
         run: bundle install
+
+      - name: Add Swift plugin sources to the Xcode project
+        run: bundle exec ruby scripts/ios/sync-project.rb
 
       - name: Build and upload to TestFlight
         run: bundle exec fastlane ios beta

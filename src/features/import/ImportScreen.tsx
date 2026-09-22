@@ -5,11 +5,13 @@ import { repo } from "@/app/services";
 import { draftContext, llmEnv } from "@/app/llmEnv";
 import { useSettings } from "@/app/useSettings";
 import { parsePasteImport, parseTsvLines } from "@/core/import/paste";
-import { draftsFromTranslateLog, latestTimestamp, parseTranslateLog, rowsAfter } from "@/core/import/translateLog";
+import { latestTimestamp, parseTranslateLog, rowsAfter } from "@/core/import/translateLog";
 import type { ImportBatch } from "@/core/types";
 import { enrichEntryIds } from "@/features/entries/enrichService";
+import { createCardsFromLookups, newLookup } from "@/features/translate/lookupsService";
 import { runJob, useJob } from "@/app/jobs";
 import { JobBar } from "./DraftsTable";
+import { ManualAddCard } from "./ManualAddCard";
 import { prepareImage } from "@/llm/image";
 import { draftFromImage, draftFromText, draftManual, scanText, SCAN_THRESHOLD_WORDS } from "@/llm/pipelines";
 import type { EntryDraft } from "@/core/types";
@@ -26,11 +28,11 @@ export function ImportScreen() {
   const [msg, setMsg] = useState<string | undefined>();
   const [paste, setPaste] = useState("");
   const [text, setText] = useState("");
-  const [word, setWord] = useState("");
   const [pageRef, setPageRef] = useState("");
   const [tag, setTag] = useState("");
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [bareCount, setBareCount] = useState(0);
+  const [lookupCount, setLookupCount] = useState(0);
   const cameraInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const logInput = useRef<HTMLInputElement>(null);
@@ -42,6 +44,33 @@ export function ImportScreen() {
   async function refreshBatches() {
     setBatches(await repo.listBatches());
     setBareCount((await repo.entryIdsWithoutSentences()).length);
+    setLookupCount(await repo.countUnconsumedLookups());
+  }
+
+  /** Lookups → one batch; the table opens at once and fills in while Claude enriches (when a key exists). */
+  function onCreateFromLookups() {
+    let opened = false;
+    const handle = runJob({
+      label: "Creating cards from lookups",
+      task: async (signal, progress) => {
+        const ctx = hasKey ? await draftContext() : undefined;
+        return createCardsFromLookups(repo, hasKey ? llmEnv : undefined, ctx, {
+          signal,
+          onProgress: progress,
+          onBatch: (batchId) => {
+            opened = true;
+            nav(`/import/batch/${batchId}`);
+          },
+        });
+      },
+      summary: (r) => (r.batchId ? `${r.drafts} drafts from ${r.lookups} lookups${r.enriched ? `, ${r.enriched} enriched ($${r.usd.toFixed(3)})` : ""}` : "No new lookups"),
+    });
+    void handle.result.then(async (r) => {
+      if (!opened) {
+        setMsg(r && r.lookups > 0 ? `${r.drafts} drafts` : "No new lookups since the last run.");
+        await refreshBatches();
+      }
+    });
   }
 
   function onEnrichAll() {
@@ -147,29 +176,36 @@ export function ImportScreen() {
     });
   }
 
+  /** The Shortcuts file (until M6): new lines become lookups, then the same job as the button above. */
   async function onTranslateLog(file: File) {
     await run("Translate log import", async () => {
       const parsed = parseTranslateLog(await file.text());
       const s = await repo.getSettings();
       const fresh = rowsAfter(parsed.rows, s.translateLogImportedUntil);
       const errors = parsed.errors.length ? ` Skipped lines: ${parsed.errors.join("; ")}` : "";
-      const drafts = draftsFromTranslateLog(fresh);
       const newest = latestTimestamp(fresh);
       if (newest) await repo.saveSettings({ translateLogImportedUntil: newest });
-      if (drafts.length === 0) return { message: `No new lookups since the last import.${errors}` };
-      const batch = await createBatch(repo, { sourceType: "translate", label: `Translate log ${new Date().toLocaleDateString()}`, drafts, frequency: await loadFrequency() });
-      return { batchId: batch.id, message: `${drafts.length} items from ${fresh.length} new lookups.${errors}` };
+      if (fresh.length === 0) return { message: `No new lookups since the last import.${errors}` };
+      await repo.putLookups(fresh.map((r) => newLookup({ dir: r.dir, src: r.src, dst: r.dst, provider: "shortcuts", at: Number.isNaN(Date.parse(r.at)) ? undefined : new Date(r.at).toISOString() })));
+      onCreateFromLookups();
+      return { message: `${fresh.length} new lookups from the file.${errors}` };
     });
   }
 
-  async function onWord() {
-    await run("Add word", async () => {
+  function onManualAi(input: string, manualTag: string) {
+    void run("Add word", async () => {
       const ctx = await draftContext();
-      const out = await draftManual(llmEnv, ctx, word.trim());
+      const out = await draftManual(llmEnv, ctx, input);
       if (out.drafts.length === 0) return { message: "Nothing drafted." };
-      const batch = await createBatch(repo, { sourceType: "manual", label: word.trim(), ...tagOpt, drafts: out.drafts, frequency: await loadFrequency() });
-      setWord("");
+      const batch = await createBatch(repo, { sourceType: "manual", label: input, ...(manualTag ? { tag: manualTag } : {}), drafts: out.drafts, frequency: await loadFrequency() });
       return { batchId: batch.id, message: `Drafted for $${out.usd.toFixed(3)}` };
+    });
+  }
+
+  function onManualSave(draft: EntryDraft, manualTag: string) {
+    void run("Add word", async () => {
+      const batch = await createBatch(repo, { sourceType: "manual", label: draft.lemma, ...(manualTag ? { tag: manualTag } : {}), drafts: [draft], frequency: await loadFrequency() });
+      return { batchId: batch.id, message: "Saved as typed" };
     });
   }
 
@@ -208,6 +244,18 @@ export function ImportScreen() {
           No Anthropic API key yet. Photo, text and word imports need one (Settings). Paste import works without it.
         </div>
       )}
+
+      <Card className="mb-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm">
+            <div className="font-medium">{lookupCount === 0 ? "No new lookups" : `${lookupCount} lookups waiting`}</div>
+            <div className="text-muted">Every translation becomes a draft{hasKey ? ", enriched with Claude" : ""}.</div>
+          </div>
+          <Button variant="primary" disabled={!!busy || lookupCount === 0 || job?.status === "running"} onClick={onCreateFromLookups}>
+            Create cards
+          </Button>
+        </div>
+      </Card>
 
       {bareCount > 0 && hasKey && (
         <Card className="mb-4">
@@ -302,11 +350,13 @@ export function ImportScreen() {
         </Button>
       </Card>
 
+      <ManualAddCard hasKey={hasKey} busy={!!busy} tag={tag.trim()} onAi={onManualAi} onSave={onManualSave} />
+
       <Card className="mb-4">
-        <h2 className="mb-2 font-medium">Translate log</h2>
+        <h2 className="mb-2 font-medium">Translate log (Shortcuts)</h2>
         <p className="mb-3 text-sm text-muted">
-          The file the lock-screen Shortcuts write: iCloud Drive › Kurzbefehle › vocab-import › translate-log.txt. Only lookups newer than the last import are
-          added. Works without an API key.
+          The file the lock-screen Shortcuts write: iCloud Drive › Kurzbefehle › vocab-import › translate-log.txt. New lines become lookups and go
+          straight into a drafts table.
         </p>
         <Button className="w-full" disabled={!!busy} onClick={() => logInput.current?.click()}>
           Choose translate-log.txt
@@ -314,21 +364,6 @@ export function ImportScreen() {
         <input ref={logInput} type="file" accept=".jsonl,.txt,.json,text/plain,application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onTranslateLog(f); e.target.value = ""; }} />
       </Card>
 
-      <Card className="mb-4">
-        <h2 className="mb-2 font-medium">Single word or phrase</h2>
-        <div className="flex gap-2">
-          <input
-            className="flex-1 rounded-xl bg-surface-2 px-3 py-2"
-            placeholder="Spanish or English"
-            value={word}
-            onChange={(e) => setWord(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && word.trim() && void onWord()}
-          />
-          <Button variant="primary" disabled={!hasKey || !word.trim() || !!busy} onClick={() => void onWord()}>
-            Add
-          </Button>
-        </div>
-      </Card>
     </Screen>
   );
 }

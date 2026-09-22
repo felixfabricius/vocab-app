@@ -42,10 +42,11 @@ describe("translate log", () => {
     expect(r.errors[0]).toMatch(/^Line 4:/);
   });
 
-  it("turns short items into drafts and skips long sentences", () => {
+  it("turns every lookup into a draft, sentences as phrases, deduped by Spanish text", () => {
     const d = draftsFromTranslateLog(parseTranslateLog(log).rows);
-    expect(d.map((x) => x.lemma)).toEqual(["¿Dónde está el baño", "al tiro"]);
+    expect(d.map((x) => x.lemma)).toEqual(["¿Dónde está el baño", "al tiro", "Quisiera reservar una mesa para dos personas esta noche por favor"]);
     expect(d[1]?.senses[0]?.gloss).toBe("right away");
     expect(d[0]?.isPhrase).toBe(true);
+    expect(d[2]?.pos).toBe("phrase");
   });
 });

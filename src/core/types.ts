@@ -268,6 +268,8 @@ export interface Settings {
   dailySpendCapUsd: number;
   /** Newest translate-log timestamp already imported; older lines are skipped */
   translateLogImportedUntil?: string;
+  /** Default translator on the translate screen; "apple" only exists in the native app */
+  translateProvider: "apple" | "claude";
   updatedAt: string;
 }
 
@@ -308,5 +310,6 @@ export const DEFAULT_SETTINGS: Settings = {
   model: "claude-opus-5",
   speechRate: 0.95,
   dailySpendCapUsd: 1,
+  translateProvider: "apple",
   updatedAt: new Date(0).toISOString(),
 };
