@@ -87,7 +87,9 @@ export async function createBatch(repo: Repository, input: CreateBatchInput): Pr
     push(draft, group);
     const parent = suggestions[suggestions.length - 1];
     const parentSid = parent && parent.draft === draft ? parent.id : parentId;
-    if (draft.generatedSentence) {
+    // From-sentence words reuse the parent's sentence (generated, or the source sentence in v2 blocks).
+    const parentSentence = draft.generatedSentence ?? draft.sourceSentence;
+    if (parentSentence) {
       for (const f of draft.fromSentence) {
         const child: EntryDraft = {
           lemma: f.lemma,
@@ -97,8 +99,7 @@ export async function createBatch(repo: Repository, input: CreateBatchInput): Pr
           priority: "standard",
           regional: "neutral",
           fromSentence: [],
-          // Reuse the parent's generated sentence as this word's sentence.
-          sourceSentence: { es: draft.generatedSentence.es, en: draft.generatedSentence.en, ...(f.span ? { span: f.span } : {}) },
+          sourceSentence: { es: parentSentence.es, en: parentSentence.en, ...(f.span ? { span: f.span } : {}) },
         };
         push(child, "fromSentences", parentSid);
       }

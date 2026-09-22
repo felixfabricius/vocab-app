@@ -15,7 +15,8 @@ import { ManualAddCard } from "./ManualAddCard";
 import { prepareImage } from "@/llm/image";
 import { draftFromImage, draftFromText, draftManual, scanText, SCAN_THRESHOLD_WORDS } from "@/llm/pipelines";
 import type { EntryDraft } from "@/core/types";
-import { buildExtractPrompt } from "@/llm/prompts/extract";
+import type { BuilderContext } from "@/llm/prompts/builders";
+import { PromptBuilderCard } from "./PromptBuilderCard";
 import { createBatch } from "./importService";
 import { loadFrequency } from "@/core/priority/frequency";
 
@@ -40,6 +41,7 @@ export function ImportScreen() {
   const hasKey = !!settings?.anthropicKey;
   const job = useJob();
   const tagOpt = tag.trim() ? { tag: tag.trim() } : {};
+  const pastedTag = paste.includes("{") ? parsePasteImport(paste).tag : undefined;
 
   async function refreshBatches() {
     setBatches(await repo.listBatches());
@@ -132,11 +134,13 @@ export function ImportScreen() {
       if (parsed.items.length === 0) {
         return { message: parsed.errors.map((e) => e.message).join("\n") || "Nothing to import" };
       }
+      // The tag inside the pasted block wins over the field (it is what the prompt asked for).
+      const batchTag = parsed.tag ?? tag.trim();
       const batch = await createBatch(repo, {
         sourceType: "paste",
         label: `Paste ${new Date().toLocaleString()}`,
         ...(pageRef ? { pageRef } : {}),
-        ...tagOpt,
+        ...(batchTag ? { tag: batchTag } : {}),
         drafts: parsed.items,
         frequency: await loadFrequency(),
       });
@@ -209,22 +213,9 @@ export function ImportScreen() {
     });
   }
 
-  async function copyPrompt() {
+  async function builderContext(): Promise<BuilderContext> {
     const ctx = await draftContext();
-    const prompt = buildExtractPrompt({
-      format: "paste",
-      chunking: ctx.settings.chunking,
-      knownLemmas: ctx.knownLemmas,
-      ignoreLemmas: ctx.ignoreLemmas,
-      sourceHint: "a photo of a textbook or book page (attached)",
-    });
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setMsg("Prompt copied. Paste it into the Claude app together with the photo, then paste the reply below.");
-    } catch {
-      setMsg("Clipboard blocked; long-press the text box below to copy manually.");
-      setPaste(prompt);
-    }
+    return { chunking: ctx.settings.chunking, knownLemmas: ctx.knownLemmas, ignoreLemmas: ctx.ignoreLemmas };
   }
 
   const open = batches.filter((b) => b.stage !== "done");
@@ -318,24 +309,15 @@ export function ImportScreen() {
         <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onPhoto(f); e.target.value = ""; }} />
       </Card>
 
-      <Card className="mb-4">
-        <h2 className="mb-2 font-medium">Paste from the Claude app</h2>
-        <p className="mb-3 text-sm text-muted">
-          Copy the extraction prompt, send it with a photo in the Claude app, paste the reply here. Also accepts plain lines: <code>spanish ⇥ english</code>.
-        </p>
-        <Button className="mb-3 w-full" onClick={() => void copyPrompt()}>
-          Copy extraction prompt
-        </Button>
-        <textarea
-          className="mb-3 h-32 w-full rounded-xl bg-surface-2 p-3 text-sm"
-          placeholder="Paste the reply here"
-          value={paste}
-          onChange={(e) => setPaste(e.target.value)}
-        />
-        <Button variant="primary" className="w-full" disabled={!paste.trim() || !!busy} onClick={() => void onPaste()}>
-          Import pasted text
-        </Button>
-      </Card>
+      <PromptBuilderCard
+        getContext={builderContext}
+        onCopied={(built) => setTag(built.tag)}
+        paste={paste}
+        setPaste={setPaste}
+        onImport={() => void onPaste()}
+        busy={!!busy}
+        importedTag={pastedTag}
+      />
 
       <Card className="mb-4">
         <h2 className="mb-2 font-medium">Text</h2>

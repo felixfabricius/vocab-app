@@ -40,6 +40,29 @@ describe("parsePasteImport", () => {
     expect(r.errors[0]?.index).toBe(2);
   });
 
+  it("reads a v2 block with a batch tag and one sentence per item", () => {
+    const v2 = `\`\`\`json
+{ "marker": "VOCABAPP-IMPORT v2", "tag": "Casa de Papel S1E1", "notes": null, "items": [
+  { "lemma": "atracar", "pos": "verb", "senses": ["to rob (a bank)"], "priority": "standard", "irregular": false,
+    "sentence": { "es": "Vamos a atracar la Fábrica de Moneda.", "en": "We're going to rob the Mint.", "target": "atracar", "verbForm": "infinitive" },
+    "sentenceSource": "source", "fromSentence": [{ "lemma": "fábrica", "pos": "noun", "gloss": "factory", "target": "Fábrica" }] },
+  { "lemma": "al tiro", "pos": "phrase", "senses": ["right away"], "regional": "chile",
+    "sentence": { "es": "Voy al tiro.", "en": "I'm going right away.", "target": "al tiro" } }
+] }
+\`\`\``;
+    const r = parsePasteImport(v2);
+    expect(r.errors).toEqual([]);
+    expect(r.tag).toBe("Casa de Papel S1E1");
+    const a = r.items[0]!;
+    expect(a.sourceSentence?.es).toBe("Vamos a atracar la Fábrica de Moneda.");
+    expect(a.sourceSentence?.span).toEqual([8, 15]);
+    expect(a.generatedSentence).toBeUndefined();
+    expect(a.fromSentence[0]?.span).toEqual([19, 26]);
+    const b = r.items[1]!;
+    expect(b.generatedSentence?.es).toBe("Voy al tiro."); // sentenceSource omitted → generated
+    expect(b.isPhrase).toBe(true);
+  });
+
   it("fails cleanly without JSON", () => {
     const r = parsePasteImport("nothing here");
     expect(r.items).toEqual([]);

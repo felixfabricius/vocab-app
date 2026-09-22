@@ -44,7 +44,7 @@ describe("app smoke", () => {
     await waitFor(() => expect(screen.getByPlaceholderText("Search")).toBeTruthy());
 
     fireEvent.click(screen.getByText("Import"));
-    await waitFor(() => expect(screen.getByText("Copy extraction prompt")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Copy prompt")).toBeTruthy());
 
     fireEvent.click(screen.getByText("Translate"));
     await waitFor(() => expect(screen.getByText("English → Spanish")).toBeTruthy());

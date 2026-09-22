@@ -129,12 +129,12 @@ Semantics that matter:
 
 ## 11. Known gaps and small bugs to carry over
 
-- Native phase progress (2026-09-22): M1 (wrapper, CI, TestFlight) built and uploaded; its phone checklist is still to be ticked. M2 (Again/Good only, scroll containment with `scrollEnabled: false`, tags with Dexie v2, study by tag, flat drafts table with swipe-to-remove, jobs with progress + cancel) and M3 (first Swift plugins `Speech` and `Translate` registered in `ViewController.swift`, added to the project in CI by `scripts/ios/sync-project.rb`; offline translate with pack download in Settings; live on-device dictation; lookups table + "Create cards" with automatic enrichment of drafts via `enrichBatchDrafts`; manual add with "Complete with AI") are implemented but not yet verified on the phone; M4 is next.
+- Native phase progress (2026-09-22): M1 (wrapper, CI, TestFlight) built and uploaded; its phone checklist is still to be ticked. M2 (Again/Good only, scroll containment with `scrollEnabled: false`, tags with Dexie v2, study by tag, flat drafts table with swipe-to-remove, jobs with progress + cancel) and M3 (first Swift plugins `Speech` and `Translate` registered in `ViewController.swift`, added to the project in CI by `scripts/ios/sync-project.rb`; offline translate with pack download in Settings; live on-device dictation; lookups table + "Create cards" with automatic enrichment of drafts via `enrichBatchDrafts`; manual add with "Complete with AI") are implemented but not yet verified on the phone. M4 (prompt builders series/textbook/book/context in `src/llm/prompts/builders.ts`, wire format `VOCABAPP-IMPORT v2` with one `sentence` + `sentenceSource` per item and a top-level `tag`; v1 pastes still parse through `LegacyEntryDraftSchema`) is implemented; M5 is next.
 - Fixed 2026-09-21: the schema bug that broke every Claude call, and the English meaning on both sides of conjugation cards.
 - `settings.playback = "handsFree"` is defined but unused (M7).
 - Suggestion editor edits `generatedSentence.es` and clears its span (the highlight disappears after editing a sentence; recomputed only if `target` is re-derived; acceptable).
-- Import screen's Claude-app prompt is generic (`sourceHint` = textbook page); the requested prompt builders (series, textbook, book, context) do not exist yet.
-- Translate-log enrichment is manual (Enrich button in Import / after accept in the batch screen).
+- Prompt builders (series, textbook, book, context) exist since M4; the pasted block's `tag` wins over the Import screen's tag field.
+- Lookup enrichment is automatic (M3); the Enrich button remains for entries without sentences.
 - Tags: batch tag on import, editable on the entry, filter chips on Words, study-by-tag on Today (since M2).
 - Stats screen is minimal (14-day bar chart, retention, counts).
 - Diagnostics page is reachable from Settings; it is the place to verify voices/camera/storage on a new build.

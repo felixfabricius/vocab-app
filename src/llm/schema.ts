@@ -35,7 +35,7 @@ export const FromSentenceSchema = z.object({
   target: z.string().nullable(),
 });
 
-export const EntryDraftSchema = z.object({
+const DraftBaseSchema = z.object({
   lemma: z.string(),
   pos: PosSchema,
   isPhrase: z.boolean(),
@@ -49,12 +49,26 @@ export const EntryDraftSchema = z.object({
   regional: RegionalSchema,
   note: z.string().nullable(),
   irregular: z.boolean().nullable(),
-  sourceSentence: SentenceOutSchema.nullable(),
-  generatedSentence: GeneratedSentenceSchema.nullable(),
   fromSentence: z.array(FromSentenceSchema),
   pageRef: z.string().nullable(),
 });
+
+/**
+ * Wire format v2 (API and `VOCABAPP-IMPORT v2`): one sentence per item, copied
+ * from the source when the item occurred there, otherwise generated.
+ */
+export const EntryDraftSchema = DraftBaseSchema.extend({
+  sentence: GeneratedSentenceSchema.nullable(),
+  sentenceSource: z.enum(["source", "generated"]).nullable(),
+});
 export type EntryDraftOut = z.infer<typeof EntryDraftSchema>;
+
+/** Wire format v1 (`VOCABAPP-IMPORT v1`, the web phase): source and generated sentences as two fields. */
+export const LegacyEntryDraftSchema = DraftBaseSchema.extend({
+  sourceSentence: SentenceOutSchema.nullable(),
+  generatedSentence: GeneratedSentenceSchema.nullable(),
+});
+export type LegacyEntryDraftOut = z.infer<typeof LegacyEntryDraftSchema>;
 
 export const ExtractResultSchema = z.object({
   items: z.array(EntryDraftSchema),
@@ -93,7 +107,10 @@ function spanOf(es: string, target: string | null, span: number[] | null): [numb
   return undefined;
 }
 
-export function normalizeDraft(d: EntryDraftOut): EntryDraft {
+type WireSentence = z.infer<typeof GeneratedSentenceSchema>;
+type WireFrom = z.infer<typeof FromSentenceSchema>;
+
+function normalizeBase(d: z.infer<typeof DraftBaseSchema>): EntryDraft {
   const out: EntryDraft = {
     lemma: d.lemma.trim(),
     pos: d.pos,
@@ -111,19 +128,49 @@ export function normalizeDraft(d: EntryDraftOut): EntryDraft {
   if (d.note) out.note = d.note;
   if (d.irregular != null || d.pos === "verb") out.verb = { irregular: d.irregular ?? false };
   if (d.pageRef) out.pageRef = d.pageRef;
+  return out;
+}
+
+function fromSentenceWithSpans(es: string, items: WireFrom[]): EntryDraft["fromSentence"] {
+  return items.map((f) => {
+    const fs = spanOf(es, f.target, null);
+    return { lemma: f.lemma.trim(), pos: f.pos, gloss: f.gloss.trim(), ...(fs ? { span: fs } : {}) };
+  });
+}
+
+function sentenceWithSpan(s: WireSentence) {
+  const span = spanOf(s.es, s.target, s.span);
+  return { es: s.es, en: s.en, ...(span ? { span } : {}), ...(s.verbForm ? { verbForm: s.verbForm } : {}) };
+}
+
+/** v2 wire item → internal draft (`sourceSentence` / `generatedSentence` by `sentenceSource`). */
+export function normalizeDraft(d: EntryDraftOut): EntryDraft {
+  const out = normalizeBase(d);
+  if (d.sentence) {
+    const s = sentenceWithSpan(d.sentence);
+    if (d.sentenceSource === "source") {
+      const { verbForm: _v, ...src } = s;
+      out.sourceSentence = src;
+    } else {
+      out.generatedSentence = s;
+    }
+    out.fromSentence = fromSentenceWithSpans(d.sentence.es, d.fromSentence);
+  }
+  return out;
+}
+
+/** v1 wire item → internal draft; both sentences are kept when present. */
+export function normalizeLegacyDraft(d: LegacyEntryDraftOut): EntryDraft {
+  const out = normalizeBase(d);
   if (d.sourceSentence) {
-    const s = d.sourceSentence;
-    const span = spanOf(s.es, s.target, s.span);
-    out.sourceSentence = { es: s.es, en: s.en, ...(span ? { span } : {}) };
+    const { verbForm: _v, ...src } = sentenceWithSpan({ ...d.sourceSentence, verbForm: null });
+    out.sourceSentence = src;
   }
   if (d.generatedSentence) {
-    const s = d.generatedSentence;
-    const span = spanOf(s.es, s.target, s.span);
-    out.generatedSentence = { es: s.es, en: s.en, ...(span ? { span } : {}), ...(s.verbForm ? { verbForm: s.verbForm } : {}) };
-    out.fromSentence = d.fromSentence.map((f) => {
-      const fs = spanOf(s.es, f.target, null);
-      return { lemma: f.lemma.trim(), pos: f.pos, gloss: f.gloss.trim(), ...(fs ? { span: fs } : {}) };
-    });
+    out.generatedSentence = sentenceWithSpan(d.generatedSentence);
+    out.fromSentence = fromSentenceWithSpans(d.generatedSentence.es, d.fromSentence);
+  } else if (d.sourceSentence) {
+    out.fromSentence = fromSentenceWithSpans(d.sourceSentence.es, d.fromSentence);
   }
   return out;
 }
