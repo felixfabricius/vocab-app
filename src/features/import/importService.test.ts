@@ -54,6 +54,7 @@ describe("import service", () => {
     const res = await acceptBatch(repo, batch.id);
     expect(res.created).toBe(2); // hacer planes + sábado
     expect(res.attached).toBe(1); // casa
+    expect(res.bareIds).toEqual([]); // both have the shared sentence; a phrase would not count anyway
     expect(await db.sentences.count()).toBe(1);
     const planes = await repo.findEntry("hacer planes", "phrase");
     const sabado = await repo.findEntry("sábado", "noun");
@@ -61,6 +62,7 @@ describe("import service", () => {
     expect(planes?.isPhrase).toBe(true);
     expect(planes?.tags).toEqual(["aula p. 3"]);
     expect(casa?.tags).toEqual(["seed", "aula p. 3"]); // tag added to the attached existing entry
+    expect(await repo.entryIdsWithoutSentences()).toEqual([casa!.id]); // the seed noun; phrases never appear
     expect(sabado?.priority).toBe("standard");
     expect((await repo.allTags()).map((t) => t.tag)).toContain("aula p. 3");
     const encs = await db.encounters.toArray();

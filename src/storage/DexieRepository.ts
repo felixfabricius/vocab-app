@@ -161,7 +161,11 @@ export class DexieRepository implements Repository {
       this.db.encounters.toArray(),
     ]);
     const has = new Set(encounters.map((e) => e.entryId));
-    return entries.filter((e) => !has.has(e.id)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).map((e) => e.id);
+    // A phrase is its own example; only single words are candidates for enrichment.
+    return entries
+      .filter((e) => !has.has(e.id) && !e.isPhrase && e.pos !== "phrase")
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .map((e) => e.id);
   }
 
   async trashEntry(entryId: string, at: string) {

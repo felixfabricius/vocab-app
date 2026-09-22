@@ -127,7 +127,7 @@ export interface AcceptResult {
   attached: number;
   /** ids of newly created entries */
   createdIds: string[];
-  /** created entries that have no sentence (candidates for enrichment) */
+  /** created single-word entries that have no sentence (candidates for enrichment); phrases are their own example */
   bareIds: string[];
 }
 
@@ -266,7 +266,7 @@ export async function acceptBatch(repo: Repository, batchId: string): Promise<Ac
     created,
     attached,
     createdIds: newEntries.map((e) => e.id),
-    bareIds: newEntries.filter((e) => !withSentence.has(e.id)).map((e) => e.id),
+    bareIds: newEntries.filter((e) => !withSentence.has(e.id) && !e.isPhrase).map((e) => e.id),
   };
 }
 

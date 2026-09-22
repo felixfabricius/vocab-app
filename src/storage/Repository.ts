@@ -47,7 +47,7 @@ export interface Repository {
   putSentences(sentences: Sentence[]): Promise<void>;
   putEncounters(encounters: Encounter[]): Promise<void>;
   sentencesForEntry(entryId: string): Promise<{ sentence: Sentence; encounter: Encounter }[]>;
-  /** Active entry ids that have no sentence at all (candidates for enrichment). */
+  /** Active single-word entries with no sentence at all (candidates for enrichment); phrases are their own example. */
   entryIdsWithoutSentences(): Promise<string[]>;
   trashEntry(entryId: string, at: string): Promise<void>;
   restoreEntry(entryId: string, at: string): Promise<void>;
