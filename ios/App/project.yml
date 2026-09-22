@@ -67,6 +67,8 @@ targets:
       Debug: ../debug.xcconfig
     settings:
       base:
+        # xcodegen sets targets to iPhone+iPad; project-level settings do not override that.
+        TARGETED_DEVICE_FAMILY: "1"
         PRODUCT_NAME: ALaLuna
         PRODUCT_BUNDLE_IDENTIFIER: in.fabricius.vocab
         INFOPLIST_FILE: App/Info.plist
@@ -86,6 +88,7 @@ targets:
       - path: ../Widgets
     settings:
       base:
+        TARGETED_DEVICE_FAMILY: "1"
         PRODUCT_NAME: ALaLunaWidgets
         PRODUCT_BUNDLE_IDENTIFIER: in.fabricius.vocab.widgets
         INFOPLIST_FILE: ../Widgets/Info.plist
