@@ -18,11 +18,13 @@ describe("interpretAnswer", () => {
 
 function fakes(answers: string[]) {
   const spoken: string[] = [];
+  const cues: string[] = [];
   const deps: VoiceDeps = {
     speak: async (t) => void spoken.push(t),
     cancelSpeech: () => undefined,
     listen: async () => answers.shift() ?? "",
     wait: async () => undefined,
+    cue: async (c) => void cues.push(c),
   };
   const calls: string[] = [];
   let flipped = false;
@@ -36,7 +38,7 @@ function fakes(answers: string[]) {
     skip: () => calls.push("skip"),
     isFlipped: () => flipped,
   };
-  return { deps, h, spoken, calls };
+  return { deps, h, spoken, calls, cues };
 }
 
 const card = { front: "house", back: ["casa", "Mi casa es grande."] };
@@ -49,6 +51,7 @@ describe("runVoiceCard", () => {
     expect(r).toBe("graded");
     expect(f.spoken).toEqual(["house", "casa", "Mi casa es grande."]);
     expect(f.calls).toEqual(["flip", "grade:good:voice"]);
+    expect(f.cues).toEqual(["listen", "good"]);
   });
 
   it("repeats on otra vez, then grades Again on no", async () => {
@@ -64,6 +67,7 @@ describe("runVoiceCard", () => {
     expect(r).toBe("skipped");
     expect(f.spoken.filter((t) => t === "casa").length).toBe(2);
     expect(f.calls).toEqual(["flip", "skip"]);
+    expect(f.cues).toEqual(["listen", "listen", "skip"]);
   });
 
   it("stops when cancelled", async () => {

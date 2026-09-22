@@ -5,6 +5,7 @@
  * (screen locked) would keep this object and add a keep-alive audio session.
  */
 import type { AudioPlayer } from "@/audio/AudioPlayer";
+import { playCue } from "@/audio/tones";
 import { configureAudioSession, deactivateAudioSession } from "@/native/audioSession";
 import type { LiveTranscriber } from "@/speech/LiveTranscriber";
 import type { InputHandlers } from "./InputSource";
@@ -36,6 +37,7 @@ export class VoiceInput {
             });
         }),
       wait: (ms) => new Promise((r) => setTimeout(r, ms)),
+      cue: (c) => playCue(c).catch(() => undefined),
     };
   }
 

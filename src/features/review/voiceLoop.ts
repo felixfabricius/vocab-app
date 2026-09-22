@@ -34,12 +34,16 @@ export function interpretAnswer(text: string): Answer {
   return "none";
 }
 
+export type VoiceCue = "listen" | "good" | "again" | "repeat" | "skip";
+
 export interface VoiceDeps {
   speak(text: string, lang?: string): Promise<void>;
   cancelSpeech(): void;
   /** resolves with the recognised text, "" on silence */
   listen(seconds: number): Promise<string>;
   wait(ms: number): Promise<void>;
+  /** short audio confirmation; resolves when it has played */
+  cue(cue: VoiceCue): Promise<void>;
 }
 
 export interface VoiceCard {
@@ -98,16 +102,18 @@ export async function runVoiceCard(
   for (;;) {
     if (signal.aborted) return "cancelled";
     onStatus({ phase: "listening" });
+    await deps.cue("listen");
     const heard = await deps.listen(s.listenSeconds);
     if (signal.aborted) return "cancelled";
     const answer = interpretAnswer(heard);
     if (heard.trim()) onStatus({ phase: "heard", text: heard, answer });
     if (answer === "good" || answer === "again") {
-      await deps.wait(300);
+      await deps.cue(answer);
       h.grade(answer, "voice");
       return "graded";
     }
     if (answer === "repeat") {
+      await deps.cue("repeat");
       onStatus({ phase: "back" });
       await speakBack(deps, card, signal);
       continue;
@@ -115,6 +121,7 @@ export async function runVoiceCard(
     silences++;
     if (silences >= 2) {
       onStatus({ phase: "skipped" });
+      await deps.cue("skip");
       h.skip();
       return "skipped";
     }
