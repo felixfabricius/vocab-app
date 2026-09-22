@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router";
+import { App as CapApp } from "@capacitor/app";
 import { NavBar, Spinner } from "./components/ui";
-import { repo } from "./services";
+import { getCloudSync, repo } from "./services";
+import { isNative } from "@/native/platform";
 import { seedIfNeeded } from "./seed";
 import { TodayScreen } from "@/features/today/TodayScreen";
 import { ReviewScreen } from "@/features/review/ReviewScreen";
@@ -46,6 +48,13 @@ export function App() {
   useEffect(() => {
     (async () => {
       try {
+        // A fresh install restores from the iCloud snapshot before the seed runs (M5).
+        try {
+          const r = await getCloudSync().restoreIfNeeded();
+          if (r !== "none") console.info(`cloud: ${r} from iCloud snapshot`);
+        } catch (e) {
+          console.warn("cloud restore failed", e);
+        }
         await seedIfNeeded(repo);
         // 30-day trash: purge entries trashed more than 30 days ago.
         await repo.purgeTrashedBefore(new Date(Date.now() - 30 * 86_400_000).toISOString());
@@ -55,6 +64,15 @@ export function App() {
         setReady(true);
       }
     })();
+  }, []);
+
+  // Going to the background: drain the outbox to iCloud, snapshot when due.
+  useEffect(() => {
+    if (!isNative()) return;
+    const handle = CapApp.addListener("appStateChange", ({ isActive }) => {
+      if (!isActive) void getCloudSync().onBackground().catch((e) => console.warn("cloud sync failed", e));
+    });
+    return () => void handle.then((h) => h.remove());
   }, []);
 
   if (!ready) return <Spinner label="Preparing…" />;

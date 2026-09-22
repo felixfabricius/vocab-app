@@ -10,9 +10,12 @@ Hand edits to the template, kept as plain text changes:
   (`CURRENT_PROJECT_VERSION` = workflow run number).
 - `App/Info.plist`: display name `¡A la luna!`, usage descriptions (camera, photos, microphone, speech), portrait
   only, light status bar, `ITSAppUsesNonExemptEncryption = false`.
-- `App/App.entitlements`: empty until M5 (iCloud) and M6 (App Groups, if a widget ever shows data).
+- `App/App.entitlements`: iCloud Documents with container `iCloud.in.fabricius.vocab` (M5). `Info.plist` declares the
+  container as document-scope public (`NSUbiquitousContainers`), which makes the "A la luna" folder appear in the
+  Files app. If the build fails with "profile doesn't support the iCloud capability", run the workflow once with
+  `force_match` so match regenerates the profile from the App ID's capabilities.
 - `App/Base.lproj/Main.storyboard`: the view controller is `ViewController` (module `ALaLuna`), which registers the in-app
-  plugins in `App/Plugins/` (`SpeechPlugin`, `TranslatePlugin`) from `capacitorDidLoad()`.
+  plugins in `App/Plugins/` (`SpeechPlugin`, `TranslatePlugin`, `CloudFilesPlugin`) from `capacitorDidLoad()`.
 
 The project format is the classic one (`objectVersion = 60`, explicit file references, no synchronized folders), so
 every new Swift file needs a project entry. From M3 on, `scripts/ios/sync-project.rb` adds `App/ViewController.swift`

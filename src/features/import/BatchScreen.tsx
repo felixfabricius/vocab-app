@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Button, Card, Screen, Spinner } from "@/app/components/ui";
-import { repo } from "@/app/services";
+import { getCloudSync, repo } from "@/app/services";
 import { runJob, useJob } from "@/app/jobs";
 import type { ImportBatch, Suggestion } from "@/core/types";
 import { acceptBatch, ignoreSuggestion } from "./importService";
@@ -66,6 +66,7 @@ export function BatchScreen() {
     setBusy(true);
     try {
       const r = await acceptBatch(repo, id!);
+      void getCloudSync().drainOutbox().catch(() => undefined);
       setMsg(`${r.created} entries created, ${r.attached} existing entries updated`);
       await load();
       if (r.bareIds.length > 0) setBare(r.bareIds);

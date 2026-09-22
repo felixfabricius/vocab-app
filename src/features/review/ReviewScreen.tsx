@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Button, Spinner } from "@/app/components/ui";
-import { getAudio, repo, schedulerFor } from "@/app/services";
+import { getAudio, getCloudSync, repo, schedulerFor } from "@/app/services";
 import { newId } from "@/core/ids";
 import { buildSession, buildTagSession } from "@/core/scheduler/session";
 import { dayEnd } from "@/core/scheduler/day";
@@ -148,7 +148,9 @@ export function ReviewScreen() {
       audio.cancel();
       const r = rs.grade(state, g, env);
       setState(r.state);
-      void applyEffects(r.effects);
+      void applyEffects(r.effects).then(() => {
+        if (r.state.finished) void getCloudSync().drainOutbox().catch(() => undefined);
+      });
       if (r.state.finished) setPhase("done");
     },
     [state, env, audio, applyEffects],

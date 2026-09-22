@@ -7,5 +7,6 @@ class ViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(SpeechPlugin())
         bridge?.registerPluginInstance(TranslatePlugin())
+        bridge?.registerPluginInstance(CloudFilesPlugin())
     }
 }

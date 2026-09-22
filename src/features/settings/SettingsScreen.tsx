@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Button, Card, Row, Screen, Spinner } from "@/app/components/ui";
-import { getAudio, repo } from "@/app/services";
+import { getAudio, getCloudSync, repo } from "@/app/services";
+import type { CloudStatus } from "@/storage/cloudSync";
 import { useSettings } from "@/app/useSettings";
 import type { PlaybackMode } from "@/core/types";
 import { exportBackup, importBackup, parseBackup, saveBackupFile } from "@/storage/backup";
@@ -10,6 +11,65 @@ import { MODEL_CHOICES } from "@/llm/pricing";
 import { isNative } from "@/native/platform";
 import { packStatus, preparePack, type PackStatus } from "@/native/translate";
 import type { Settings } from "@/core/types";
+
+function CloudCard() {
+  const [status, setStatus] = useState<CloudStatus | undefined>();
+  const [msg, setMsg] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+  const refresh = async () => setStatus(await getCloudSync().status());
+  useEffect(() => {
+    void refresh();
+  }, []);
+  async function act(label: string, fn: () => Promise<string>) {
+    setBusy(true);
+    try {
+      setMsg(await fn());
+    } catch (e) {
+      setMsg(`${label} failed: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  }
+  const when = (iso?: string) => (iso ? iso.slice(0, 16).replace("T", " ") : "never");
+  return (
+    <Card className="mb-4">
+      <h2 className="mb-1 font-medium">iCloud Drive</h2>
+      {!status ? (
+        <p className="text-sm text-muted">checking…</p>
+      ) : !status.available ? (
+        <p className="text-sm text-muted">Not available: sign in to iCloud and enable iCloud Drive for this app in iOS Settings.</p>
+      ) : (
+        <>
+          <p className="text-sm text-muted">
+            Folder “A la luna” in the Files app. Snapshot written {when(status.lastSnapshotAt)}
+            {status.cloudSnapshotAt && status.cloudSnapshotAt !== status.lastSnapshotAt ? ` · cloud has ${when(status.cloudSnapshotAt)}` : ""} · {status.changeFiles} change files ·{" "}
+            {status.pendingRows} pending rows
+          </p>
+          {msg && <div className="my-2 rounded-lg bg-surface-2 p-2 text-xs">{msg}</div>}
+          <div className="mt-2 flex gap-2">
+            <Button className="flex-1" disabled={busy} onClick={() => void act("Snapshot", async () => ((await getCloudSync().writeSnapshot()) ? "Snapshot written" : "iCloud not available"))}>
+              Snapshot now
+            </Button>
+            <Button
+              className="flex-1"
+              disabled={busy || !status.cloudSnapshotAt}
+              onClick={() => {
+                if (!window.confirm("Merge the iCloud snapshot into this phone? Newer rows win.")) return;
+                void act("Restore", async () => {
+                  const r = await getCloudSync().restoreIfNeeded();
+                  return r === "none" ? "Nothing newer in iCloud" : `Done (${r}); reload the app`;
+                });
+              }}
+            >
+              Restore from iCloud
+            </Button>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
 
 function TranslateSettings({ settings, update }: { settings: Settings; update: (p: Partial<Settings>) => Promise<Settings> }) {
   const [packs, setPacks] = useState<Record<"en-es" | "es-en", PackStatus | "checking" | "error">>({ "en-es": "checking", "es-en": "checking" });
@@ -244,10 +304,12 @@ export function SettingsScreen() {
         />
       </Card>
 
+      {isNative() && <CloudCard />}
+
       <Card className="mb-4">
-        <h2 className="mb-1 font-medium">Backup</h2>
+        <h2 className="mb-1 font-medium">Backup file</h2>
         <p className="mb-3 text-sm text-muted">
-          Everything lives on this phone. Export regularly and keep the file in iCloud Drive.
+          {isNative() ? "Manual export and import, for moving data between the web app and this one." : "Everything lives on this phone. Export regularly and keep the file in iCloud Drive."}
         </p>
         <div className="flex gap-2">
           <Button variant="primary" className="flex-1" onClick={() => void onExport()}>

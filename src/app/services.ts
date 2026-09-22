@@ -11,6 +11,8 @@ import type { AudioPlayer } from "@/audio/AudioPlayer";
 import { WebSpeechPlayer } from "@/audio/WebSpeechPlayer";
 import { NativeTtsPlayer } from "@/audio/NativeTtsPlayer";
 import { isNative } from "@/native/platform";
+import { NativeCloudFiles } from "@/native/cloudFiles";
+import { CloudSync, MemoryCloudFiles } from "@/storage/cloudSync";
 
 export const repo: Repository = getRepository();
 
@@ -19,6 +21,13 @@ let player: AudioPlayer | undefined;
 export function getAudio(): AudioPlayer {
   if (!player) player = isNative() ? new NativeTtsPlayer() : new WebSpeechPlayer();
   return player;
+}
+
+let cloud: CloudSync | undefined;
+/** EXT: storage — iCloud snapshot + change log; on the web a disabled in-memory stand-in. */
+export function getCloudSync(): CloudSync {
+  if (!cloud) cloud = new CloudSync(repo, isNative() ? new NativeCloudFiles() : new MemoryCloudFiles(false));
+  return cloud;
 }
 
 const schedulerCache = new Map<string, FSRS>();

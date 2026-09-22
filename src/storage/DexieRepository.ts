@@ -311,6 +311,30 @@ export class DexieRepository implements Repository {
       for (const t of tables) await t.clear();
     });
   }
+
+  async isEmpty() {
+    return (await this.db.entries.count()) === 0 && (await this.db.cards.count()) === 0;
+  }
+
+  outboxAfter(seq: number, limit = 5000) {
+    return this.db.outbox.where("seq").above(seq).limit(limit).toArray();
+  }
+  async outboxMaxSeq() {
+    const last = await this.db.outbox.orderBy("seq").last();
+    return last?.seq ?? 0;
+  }
+  clearOutboxThrough(seq: number) {
+    return this.db.outbox.where("seq").belowOrEqual(seq).delete().then(() => undefined);
+  }
+  async getRows(table: string, ids: string[]) {
+    if (!(EXPORT_TABLES as readonly string[]).includes(table)) return [];
+    const rows = await this.table(table as ExportTable).bulkGet(ids);
+    return rows.filter((r): r is { [k: string]: unknown } => !!r);
+  }
+  async deleteRows(table: string, ids: string[]) {
+    if (!(EXPORT_TABLES as readonly string[]).includes(table)) return;
+    await this.table(table as ExportTable).bulkDelete(ids);
+  }
 }
 
 let repo: Repository | undefined;

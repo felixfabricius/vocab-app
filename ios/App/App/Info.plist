@@ -34,6 +34,18 @@
 	<string>Dictate text to translate and answer review cards by voice.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Recognise dictated text and spoken answers on this device.</string>
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.in.fabricius.vocab</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>A la luna</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

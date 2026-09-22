@@ -270,7 +270,18 @@ export interface Settings {
   translateLogImportedUntil?: string;
   /** Default translator on the translate screen; "apple" only exists in the native app */
   translateProvider: "apple" | "claude";
+  /** iCloud snapshot + change-log state (native only) */
+  cloud?: CloudState;
   updatedAt: string;
+}
+
+export interface CloudState {
+  /** outbox rows up to this seq are in the change log or the snapshot */
+  lastSeq: number;
+  /** `exportedAt` of the last snapshot this device wrote or restored */
+  lastSnapshotAt?: string;
+  /** a bulk delete happened; the change log cannot express it, write a snapshot */
+  snapshotDirty: boolean;
 }
 
 export interface LlmUsage {

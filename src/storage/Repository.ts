@@ -9,6 +9,7 @@ import type {
   IgnoreEntry,
   ImportBatch,
   Lookup,
+  OutboxRow,
   ReviewLog,
   Sense,
   Sentence,
@@ -91,4 +92,13 @@ export interface Repository {
   exportAll(): Promise<Record<string, unknown[]>>;
   importAll(data: Record<string, unknown[]>, mode: "replace" | "merge"): Promise<void>;
   clearAll(): Promise<void>;
+  /** true when no entries and no cards exist (fresh install, before the seed) */
+  isEmpty(): Promise<boolean>;
+
+  // outbox and raw rows (change-log sync)
+  outboxAfter(seq: number, limit?: number): Promise<OutboxRow[]>;
+  outboxMaxSeq(): Promise<number>;
+  clearOutboxThrough(seq: number): Promise<void>;
+  getRows(table: string, ids: string[]): Promise<unknown[]>;
+  deleteRows(table: string, ids: string[]): Promise<void>;
 }
